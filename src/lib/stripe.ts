@@ -1,5 +1,4 @@
-// Remplace STRIPE_PK par ta clé Publishable quand tu l'as
-export const STRIPE_PK = 'STRIPE_PK_PLACEHOLDER'
+export const STRIPE_PK = 'pk_live_51ThsPeGZkOqku3ZClqUyFg2ckCtXGDCu9F7L39L2nSRIrNxqdG3tklsRz2V9NZAaheCtMb4MqCfomtLcGzxiaoxD00cMxE5hHP'
 
 export const PLANS = {
   pack3: {

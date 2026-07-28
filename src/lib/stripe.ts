@@ -1,22 +1,28 @@
 export const STRIPE_PK = 'pk_live_51ThsPeGZkOqku3ZClqUyFg2ckCtXGDCu9F7L39L2nSRIrNxqdG3tklsRz2V9NZAaheCtMb4MqCfomtLcGzxiaoxD00cMxE5hHP'
 
 export const PLANS = {
-  pack3: {
-    label: 'Pack 3 bilans',
-    price: 29,
-    bilans: 3,
-    priceId: 'price_XXXXXXXXX', // à remplir dans Stripe
+  bilan1: {
+    label: '1 Bilan',
+    description: 'Un bilan complet pour un client',
+    price: 15,
+    bilans: 1,
+    type: 'one_time',
+    priceId: 'price_1TyFRzGZkOqku3ZCJsFuQXp8',
   },
-  pack10: {
-    label: 'Pack 10 bilans',
-    price: 79,
-    bilans: 10,
-    priceId: 'price_XXXXXXXXX',
-  },
-  monthly: {
-    label: 'Abonnement mensuel illimité',
+  solo: {
+    label: 'Abonnement Solo',
+    description: '1 salle — bilans illimités',
     price: 149,
-    bilans: -1, // illimité
-    priceId: 'price_XXXXXXXXX',
+    bilans: -1,
+    type: 'recurring',
+    priceId: 'price_1TyGd9GZkOqku3ZCdoe4PJPk',
+  },
+  duo: {
+    label: 'Abonnement Duo',
+    description: '2 salles — bilans illimités',
+    price: 199,
+    bilans: -1,
+    type: 'recurring',
+    priceId: 'price_1TyGe6GZkOqku3ZCOx52Wqlv',
   },
 }

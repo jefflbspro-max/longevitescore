@@ -23,7 +23,7 @@ export default function Login({ onClose }: LoginProps) {
     try {
       if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
-        if (error) setError(error.message || 'Erreur de connexion')
+if (error) setError(typeof error.message === 'string' ? error.message : JSON.stringify(error))
         else onClose()
       } else {
         const { error } = await supabase.auth.signUp({ email, password })
@@ -31,8 +31,7 @@ export default function Login({ onClose }: LoginProps) {
         else setSuccess('Compte créé ! Vérifiez votre email pour confirmer.')
       }
     } catch (e: any) {
-      setError('Une erreur est survenue. Réessayez.')
-    }
+setError(e?.message || 'Une erreur est survenue. Réessayez.')    }
 
     setLoading(false)
   }

@@ -23,15 +23,16 @@ export default function Login({ onClose }: LoginProps) {
     try {
       if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password })
-if (error) setError(typeof error.message === 'string' ? error.message : JSON.stringify(error))
+        if (error) setError(error.message || error.toString() || 'Erreur de connexion')
         else onClose()
       } else {
         const { error } = await supabase.auth.signUp({ email, password })
-        if (error) setError(error.message || 'Erreur lors de la création du compte')
-        else setSuccess('Compte créé ! Vérifiez votre email pour confirmer.')
+        if (error) setError(error.message || error.toString() || 'Erreur lors de la création du compte')
+        else setSuccess('Compte créé ! Vous pouvez maintenant vous connecter.')
       }
     } catch (e: any) {
-setError(e?.message || 'Une erreur est survenue. Réessayez.')    }
+      setError(e?.message || 'Une erreur est survenue. Réessayez.')
+    }
 
     setLoading(false)
   }
@@ -57,8 +58,12 @@ setError(e?.message || 'Une erreur est survenue. Réessayez.')    }
             onChange={e => setPassword(e.target.value)} required minLength={6}
             style={{ background: 'rgba(196,168,130,0.06)', border: '1px solid rgba(196,168,130,0.2)', borderRadius: 8, padding: '12px 14px', color: C.ivoire, fontSize: 14, outline: 'none' }}
           />
-          {error && <div style={{ color: C.rouge, fontSize: 12, padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: 6 }}>{error}</div>}
-          {success && <div style={{ color: '#22c55e', fontSize: 12, padding: '8px 12px', background: 'rgba(34,197,94,0.08)', borderRadius: 6 }}>{success}</div>}
+          {error !== '' && error !== '{}' && (
+            <div style={{ color: C.rouge, fontSize: 12, padding: '8px 12px', background: 'rgba(239,68,68,0.08)', borderRadius: 6 }}>{error}</div>
+          )}
+          {success && (
+            <div style={{ color: '#22c55e', fontSize: 12, padding: '8px 12px', background: 'rgba(34,197,94,0.08)', borderRadius: 6 }}>{success}</div>
+          )}
           <button type="submit" disabled={loading}
             style={{ background: C.or, color: C.noir, border: 'none', borderRadius: 8, padding: '13px', fontWeight: 700, fontSize: 14, cursor: 'pointer', marginTop: 4, opacity: loading ? 0.7 : 1 }}>
             {loading ? 'Chargement…' : mode === 'login' ? 'Se connecter' : 'Créer le compte'}

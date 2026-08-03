@@ -1,8 +1,22 @@
 -- =============================================
 -- Migration : consume_bilan_credit sécurisée
--- À exécuter sur la base existante via Supabase SQL Editor.
--- Ce fichier ne doit être rejoué que sur une base vierge.
+-- Destinée à la base existante.
+-- CREATE OR REPLACE FUNCTION et les permissions
+-- peuvent être rejoués sans risque.
+-- Aucune table n'est créée ou supprimée.
+-- Ne pas exécuter automatiquement sans validation.
 -- =============================================
+
+-- =============================================
+-- Sécurité : bloquer les écritures directes
+-- depuis le navigateur (anon et authenticated).
+-- La service_role n'est pas affectée.
+-- =============================================
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.profiles FROM anon, authenticated;
+REVOKE INSERT, UPDATE, DELETE ON TABLE public.bilans FROM anon, authenticated;
+
+GRANT SELECT ON TABLE public.profiles TO authenticated;
+GRANT SELECT ON TABLE public.bilans TO authenticated;
 
 -- =============================================
 -- FONCTION : consume_bilan_credit
@@ -40,11 +54,15 @@ BEGIN
     );
   END IF;
 
-  -- Limiter client_name à 200 caractères
-  v_client_name := LEFT(p_client_name, 200);
+  -- Limiter client_name à 200 caractères, NULL ou vide devient 'Client'
+  v_client_name := LEFT(
+    COALESCE(NULLIF(TRIM(p_client_name), ''), 'Client'),
+    200
+  );
 
-  -- Limiter period aux valeurs autorisées
-  IF p_period NOT IN ('M0', 'M3', 'M6', 'M9', 'M12') THEN
+  -- Limiter period aux valeurs autorisées, NULL refusé
+  IF p_period IS NULL
+     OR p_period NOT IN ('M0', 'M3', 'M6', 'M9', 'M12') THEN
     RETURN jsonb_build_object(
       'ok', false,
       'status', 'invalid_period',
@@ -88,7 +106,7 @@ BEGIN
   FROM public.bilans
   WHERE id = p_assessment_id;
 
-  IF v_existing_coach_id IS NOT NULL THEN
+  IF FOUND THEN
     IF v_existing_coach_id = v_user_id THEN
       -- Même coach : retourner le solde réel
       RETURN jsonb_build_object(
@@ -98,7 +116,7 @@ BEGIN
         'message', 'Ce bilan a déjà été enregistré.'
       );
     ELSE
-      -- Autre coach : conflit
+      -- Autre coach ou coach NULL : conflit
       RETURN jsonb_build_object(
         'ok', false,
         'status', 'assessment_id_conflict',

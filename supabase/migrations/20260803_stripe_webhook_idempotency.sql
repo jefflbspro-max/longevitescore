@@ -189,8 +189,8 @@ BEGIN
     -- Le plan existant est conservé pour l'achat ponctuel
     UPDATE public.profiles
     SET bilans_restants = CASE
-      WHEN bilans_restants = -1 THEN -1
-      ELSE bilans_restants + 1
+      WHEN COALESCE(bilans_restants, 0) = -1 THEN -1
+      ELSE COALESCE(bilans_restants, 0) + 1
     END,
     updated_at = NOW()
     WHERE id = p_coach_id;

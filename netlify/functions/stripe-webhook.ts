@@ -7,6 +7,9 @@ const ALLOWED_PRICE_IDS = new Set([
   'price_1TyGe6GZkOqku3ZCOx52Wqlv',
 ])
 
+const DEFAULT_SUPABASE_URL =
+  'https://ruuiqycgrvjhrqwiafam.supabase.co'
+
 export default async (req: Request) => {
   // Méthode : uniquement POST
   if (req.method !== 'POST') {
@@ -17,9 +20,12 @@ export default async (req: Request) => {
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY
   const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY
-  const supabaseUrl = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL
+  const supabaseUrl =
+    process.env.SUPABASE_URL ??
+    process.env.VITE_SUPABASE_URL ??
+    DEFAULT_SUPABASE_URL
 
-  if (!stripeSecretKey || !stripeWebhookSecret || !supabaseServiceKey || !supabaseUrl) {
+  if (!stripeSecretKey || !stripeWebhookSecret || !supabaseServiceKey) {
     return new Response('Server configuration error', { status: 500 })
   }
 
@@ -113,7 +119,7 @@ export default async (req: Request) => {
 
   // Vérifier le statut de paiement pour checkout.session.completed
   if (event.type === 'checkout.session.completed') {
-    const paymentStatus = (session as any).payment_status
+    const paymentStatus = session.payment_status
     if (paymentStatus === 'unpaid') {
       // Paiement non encore effectué : attendre async_payment_succeeded
       return new Response('OK', { status: 200 })
@@ -122,7 +128,7 @@ export default async (req: Request) => {
       return new Response('OK', { status: 200 })
     }
     // Traiter si payment_status = paid OU no_payment_required (avec amount_total = 0 pour tests promo)
-    if (paymentStatus === 'no_payment_required' && (session.amount_total ?? 0) !== 0) {
+    if (paymentStatus === 'no_payment_required' && session.amount_total !== 0) {
       return new Response('OK', { status: 200 })
     }
   }
@@ -141,6 +147,22 @@ export default async (req: Request) => {
     console.log(`[stripe-webhook] ${event.id}: RPC error - code=${error.code}`)
     return new Response('Internal Server Error', { status: 500 })
   }
+
+  // Vérifier la validité du résultat de la RPC
+  type StripeProcessResult = {
+    ok?: boolean
+    status?: string
+    remaining?: number
+  }
+
+  const result = data as StripeProcessResult | null
+
+  if (!data || typeof data !== 'object' || result.ok !== true) {
+    console.log(`[stripe-webhook] ${event.id}: invalid RPC result`)
+    return new Response('Internal Server Error', { status: 500 })
+  }
+
+  console.log(`[stripe-webhook] ${event.id}: ${result.status ?? 'processed'}`)
 
   return new Response('OK', { status: 200 })
 }

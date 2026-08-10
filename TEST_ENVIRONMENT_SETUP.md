@@ -90,7 +90,7 @@ Si les branches ne sont pas disponibles :
 
 Si tu veux tester le déploiement avant production :
 
-1. Pousse la branche `fix/stripe-webhook-idempotency` sur GitHub
+1. Pousse la branche de travail concernée sur GitHub
 2. Netlify crée automatiquement un deploy de preview
 3. Utilise l'URL de preview (format `https://deploy-preview-xxx--lonvitescore.netlify.app`)
 4. Configure les variables d'environnement de test dans les paramètres Netlify du deploy preview
@@ -128,13 +128,22 @@ Avant d'exécuter la migration dans l'environnement de test :
 
 ## 7. Procédure de rollback (si nécessaire)
 
+La migration `down` est non destructive. Elle désactive et supprime la RPC, puis
+retire les droits d'écriture du `service_role`, tout en conservant les tables,
+les colonnes et les historiques.
+
 En cas de problème dans l'environnement de test :
 
-1. Va dans Supabase → SQL Editor du projet de test
-2. Copie le contenu de `supabase/migrations/20260803_stripe_subscriptions_down.sql`
-3. Exécute le script
-4. Vérifie que les tables et colonnes ont été supprimées
-5. **Attention** : la migration `down` supprime les tables `stripe_subscriptions` et `stripe_invoice_events` ainsi que leur historique. C'est intentionnel pour un rollback propre dans un environnement de test.
+1. Restaure d'abord le déploiement Netlify précédent ou désactive temporairement
+   les quatre événements Stripe d'abonnement.
+2. Va dans Supabase → SQL Editor du projet de test.
+3. Copie le contenu de `supabase/migrations/20260803_stripe_subscriptions_down.sql`.
+4. Exécute le script une seule fois.
+5. Vérifie que la RPC a disparu.
+6. Vérifie que `stripe_subscriptions`, `stripe_invoice_events` et leurs lignes
+   sont toujours présentes.
+7. Consulte `ROLLBACK_PROCEDURE.md` pour les requêtes de contrôle et la procédure
+   de réactivation.
 
 ---
 

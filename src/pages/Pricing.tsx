@@ -1,9 +1,17 @@
-import React, { useState } from 'react'
+import React, { useRef, useState } from 'react'
 import { PLANS } from '../lib/stripe'
 import { useAuth } from '../lib/AuthContext'
+import { supabase } from '../lib/supabase'
 
 const C = { noir: '#0E0E12', or: '#C4A882', ivoire: '#F5F0EB', gris: '#8A8A9A' }
 const serif = "'Cormorant Garamond', Georgia, serif"
+
+type OfferKey = keyof typeof PLANS
+
+type CheckoutResponse = {
+  url?: string
+  error?: string
+}
 
 interface PricingProps {
   onClose: () => void
@@ -11,43 +19,112 @@ interface PricingProps {
 }
 
 export default function Pricing({ onClose, onShowLogin }: PricingProps) {
-  const { user } = useAuth()
-  const [loading, setLoading] = useState<string | null>(null)
+  const { user, session } = useAuth()
+  const [loading, setLoading] = useState<OfferKey | null>(null)
   const [error, setError] = useState('')
+  const requestIds = useRef<Partial<Record<OfferKey, string>>>({})
 
-  const handleSelectPlan = async (planKey: string) => {
+  const requestCheckout = (
+    offerKey: OfferKey,
+    requestId: string,
+    accessToken: string
+  ) =>
+    fetch('/api/create-checkout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ offerKey, requestId }),
+    })
+
+  const handleSelectPlan = async (offerKey: OfferKey) => {
+    if (loading) return
+
     if (!user) {
       onClose()
       onShowLogin()
       return
     }
 
-    const plan = PLANS[planKey as keyof typeof PLANS]
-    setLoading(planKey)
+    setLoading(offerKey)
     setError('')
 
+    const requestId =
+      requestIds.current[offerKey] ?? crypto.randomUUID()
+    requestIds.current[offerKey] = requestId
+
     try {
-      const res = await fetch('/api/create-checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          priceId: plan.priceId,
-          type: plan.type,
-          userId: user.id,
-          email: user.email,
-        }),
-      })
-      const data = await res.json()
-      if (data.url) {
-        window.location.href = data.url
-      } else {
-        setError('Erreur lors de la création du paiement.')
+      let accessToken = session?.access_token
+      if (!accessToken) {
+        const { data } = await supabase.auth.getSession()
+        accessToken = data.session?.access_token
       }
+
+      if (!accessToken) {
+        setError('Votre session a expiré. Reconnectez-vous.')
+        return
+      }
+
+      let response = await requestCheckout(
+        offerKey,
+        requestId,
+        accessToken
+      )
+
+      if (response.status === 401) {
+        const { data, error: refreshError } =
+          await supabase.auth.refreshSession()
+        const refreshedToken = data.session?.access_token
+
+        if (refreshError || !refreshedToken) {
+          setError('Votre session a expiré. Reconnectez-vous.')
+          return
+        }
+
+        response = await requestCheckout(
+          offerKey,
+          requestId,
+          refreshedToken
+        )
+      }
+
+      const data = (await response.json().catch(() => null)) as
+        | CheckoutResponse
+        | null
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          setError('Votre session a expiré. Reconnectez-vous.')
+        } else if (response.status === 409) {
+          setError(
+            data?.error ??
+              'Cette tentative a expiré. Rechargez la page.'
+          )
+        } else if (response.status >= 500) {
+          setError('Le service de paiement est indisponible. Réessayez.')
+        } else {
+          setError('Impossible de préparer le paiement.')
+        }
+        return
+      }
+
+      if (!data?.url) {
+        setError('Stripe n’a pas retourné de page de paiement.')
+        return
+      }
+
+      window.location.assign(data.url)
     } catch {
       setError('Erreur réseau. Réessayez.')
+    } finally {
+      setLoading(null)
     }
-    setLoading(null)
   }
+
+  const planEntries = Object.entries(PLANS) as Array<
+    [OfferKey, (typeof PLANS)[OfferKey]]
+  >
 
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.9)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20 }}>
@@ -60,7 +137,7 @@ export default function Pricing({ onClose, onShowLogin }: PricingProps) {
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-          {Object.entries(PLANS).map(([key, plan]) => (
+          {planEntries.map(([key, plan]) => (
             <div key={key} style={{
               background: key === 'solo' ? 'rgba(196,168,130,0.08)' : 'rgba(255,255,255,0.02)',
               border: `1px solid ${key === 'solo' ? 'rgba(196,168,130,0.5)' : 'rgba(196,168,130,0.15)'}`,
@@ -80,13 +157,14 @@ export default function Pricing({ onClose, onShowLogin }: PricingProps) {
               </div>
               <button
                 onClick={() => handleSelectPlan(key)}
-                disabled={loading === key}
+                disabled={loading !== null}
                 style={{
                   marginTop: 'auto', background: key === 'solo' ? C.or : 'transparent',
                   color: key === 'solo' ? C.noir : C.or,
                   border: `1px solid ${C.or}`, borderRadius: 8, padding: '12px',
-                  fontWeight: 700, fontSize: 13, cursor: 'pointer',
-                  opacity: loading === key ? 0.6 : 1
+                  fontWeight: 700, fontSize: 13,
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  opacity: loading ? 0.6 : 1
                 }}>
                 {loading === key ? 'Chargement…' : 'Choisir'}
               </button>
@@ -100,7 +178,7 @@ export default function Pricing({ onClose, onShowLogin }: PricingProps) {
             Vous devez <span onClick={() => { onClose(); onShowLogin() }} style={{ color: C.or, cursor: 'pointer', textDecoration: 'underline' }}>créer un compte</span> avant de payer.
           </div>
         )}
-        <button onClick={onClose} style={{ position: 'absolute', top: 16, right: 20, background: 'none', border: 'none', color: C.gris, fontSize: 22, cursor: 'pointer' }}>✕</button>
+        <button onClick={onClose} disabled={loading !== null} style={{ position: 'absolute', top: 16, right: 20, background: 'none', border: 'none', color: C.gris, fontSize: 22, cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.5 : 1 }}>✕</button>
       </div>
     </div>
   )

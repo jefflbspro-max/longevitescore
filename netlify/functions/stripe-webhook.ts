@@ -7,16 +7,57 @@ const ALLOWED_PRICE_IDS = new Set([
   'price_1TyGe6GZkOqku3ZCOx52Wqlv',
 ])
 
-const DEFAULT_SUPABASE_URL =
-  'https://ruuiqycgrvjhrqwiafam.supabase.co'
+const HANDLED_TYPES = new Set([
+  'checkout.session.completed',
+  'checkout.session.async_payment_succeeded',
+  'customer.subscription.updated',
+  'customer.subscription.deleted',
+  'invoice.paid',
+  'invoice.payment_failed',
+])
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+const DEFAULT_SUPABASE_URL = 'https://ruuiqycgrvjhrqwiafam.supabase.co'
+
+type ProcessResult = {
+  ok?: boolean
+  status?: string
+  remaining?: number
+}
+
+function logEvent(event: Stripe.Event, code: string) {
+  console.log(`[stripe-webhook] ${event.id} ${event.type} ${code}`)
+}
+
+function objectId(value: string | { id: string } | null | undefined) {
+  if (typeof value === 'string') return value
+  if (value && typeof value === 'object' && typeof value.id === 'string') {
+    return value.id
+  }
+  return null
+}
+
+function unixToIso(value: number | null | undefined) {
+  return typeof value === 'number'
+    ? new Date(value * 1000).toISOString()
+    : null
+}
+
+function isValidResult(data: unknown): data is ProcessResult {
+  return Boolean(
+    data &&
+      typeof data === 'object' &&
+      (data as ProcessResult).ok === true
+  )
+}
 
 export default async (req: Request) => {
-  // Méthode : uniquement POST
   if (req.method !== 'POST') {
     return new Response('Method Not Allowed', { status: 405 })
   }
 
-  // Vérifier la présence des variables d'environnement requises
   const stripeSecretKey = process.env.STRIPE_SECRET_KEY
   const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET
   const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY
@@ -29,142 +70,350 @@ export default async (req: Request) => {
     return new Response('Server configuration error', { status: 500 })
   }
 
-  // Créer les clients après vérification des variables
   const stripe = new Stripe(stripeSecretKey, { apiVersion: '2024-06-20' })
-  const supabase = createClient(supabaseUrl, supabaseServiceKey)
+  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  })
 
-  // Récupérer la signature Stripe
-  const sig = req.headers.get('stripe-signature')
-  if (!sig) {
+  const signature = req.headers.get('stripe-signature')
+  if (!signature) {
     return new Response('Missing signature', { status: 400 })
   }
 
-  // Lire le corps brut avant tout parsing
-  let body: string
+  let rawBody: string
   try {
-    body = await req.text()
+    rawBody = await req.text()
   } catch {
     return new Response('Bad request', { status: 400 })
   }
 
-  // Vérifier la signature sur le corps brut
   let event: Stripe.Event
   try {
-    event = stripe.webhooks.constructEvent(body, sig, stripeWebhookSecret)
-  } catch (err: any) {
+    event = stripe.webhooks.constructEvent(
+      rawBody,
+      signature,
+      stripeWebhookSecret
+    )
+  } catch {
     return new Response('Invalid signature', { status: 400 })
   }
-
-  // Types d'événements à traiter
-  const HANDLED_TYPES = new Set([
-    'checkout.session.completed',
-    'checkout.session.async_payment_succeeded',
-  ])
 
   if (!HANDLED_TYPES.has(event.type)) {
     return new Response('OK', { status: 200 })
   }
 
-  const session = event.data.object as Stripe.Checkout.Session
-
-  // Récupérer le userId depuis les métadonnées
-  const userId = session.metadata?.userId
-  if (!userId) {
-    console.log(`[stripe-webhook] ${event.id}: missing userId in metadata`)
-    return new Response('OK', { status: 200 })
-  }
-
-  // Valider que userId est un UUID valide
-  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  if (!UUID_REGEX.test(userId)) {
-    console.log(`[stripe-webhook] ${event.id}: invalid userId format`)
-    return new Response('OK', { status: 200 })
-  }
-
-  // Récupérer les line items avec une limite de 2
-  let lineItems: Stripe.ApiList<Stripe.LineItem>
   try {
-    lineItems = await stripe.checkout.sessions.listLineItems(session.id, { limit: 2 })
-  } catch (err: any) {
-    console.log(`[stripe-webhook] ${event.id}: Stripe API error listing line items`)
-    return new Response('Internal Server Error', { status: 500 })
-  }
+    if (
+      event.type === 'customer.subscription.updated' ||
+      event.type === 'customer.subscription.deleted'
+    ) {
+      const subscription = event.data.object as Stripe.Subscription
+      const stripeCustomerId = objectId(subscription.customer)
+      const metadataCoachId = subscription.metadata?.coachId ?? null
 
-  // Exiger exactement un line item
-  if (lineItems.data.length !== 1) {
-    console.log(`[stripe-webhook] ${event.id}: unexpected line items count`)
-    return new Response('OK', { status: 200 })
-  }
+      if (metadataCoachId && !UUID_REGEX.test(metadataCoachId)) {
+        logEvent(event, 'invalid_coach_metadata')
+        return new Response('OK', { status: 200 })
+      }
 
-  const lineItem = lineItems.data[0]
+      let profileQuery = supabase
+        .from('profiles')
+        .select('id, stripe_customer_id, stripe_subscription_id')
 
-  // Exiger quantity = 1
-  if (lineItem.quantity !== 1) {
-    console.log(`[stripe-webhook] ${event.id}: quantity is not 1`)
-    return new Response('OK', { status: 200 })
-  }
+      if (metadataCoachId) {
+        profileQuery = profileQuery.eq('id', metadataCoachId)
+      } else if (stripeCustomerId) {
+        profileQuery = profileQuery.eq('stripe_customer_id', stripeCustomerId)
+      } else {
+        logEvent(event, 'missing_identity_mapping')
+        return new Response('Internal Server Error', { status: 500 })
+      }
 
-  // Récupérer le Price ID réel depuis Stripe
-  const priceId = lineItem.price?.id
-  if (!priceId || !ALLOWED_PRICE_IDS.has(priceId)) {
-    console.log(`[stripe-webhook] ${event.id}: unknown or missing price_id`)
-    return new Response('OK', { status: 200 })
-  }
+      const { data: profile, error: profileError } =
+        await profileQuery.maybeSingle()
 
-  // Ne pas faire confiance à metadata.priceId ou metadata.planType
+      if (profileError) {
+        logEvent(event, 'profile_lookup_error')
+        return new Response('Internal Server Error', { status: 500 })
+      }
 
-  // Récupérer session.customer uniquement s'il s'agit d'une chaîne
-  const stripeCustomerId =
-    typeof session.customer === 'string' ? session.customer : null
+      if (!profile || !UUID_REGEX.test(profile.id)) {
+        logEvent(event, 'profile_unmapped')
+        return new Response('Internal Server Error', { status: 500 })
+      }
 
-  // Vérifier le statut de paiement pour checkout.session.completed
-  if (event.type === 'checkout.session.completed') {
-    const paymentStatus = session.payment_status
-    if (paymentStatus === 'unpaid') {
-      // Paiement non encore effectué : attendre async_payment_succeeded
+      if (
+        metadataCoachId &&
+        profile.id !== metadataCoachId
+      ) {
+        logEvent(event, 'profile_metadata_mismatch')
+        return new Response('Internal Server Error', { status: 500 })
+      }
+
+      if (
+        stripeCustomerId &&
+        profile.stripe_customer_id &&
+        profile.stripe_customer_id !== stripeCustomerId
+      ) {
+        logEvent(event, 'profile_customer_mismatch')
+        return new Response('Internal Server Error', { status: 500 })
+      }
+
+      const priceId = subscription.items.data[0]?.price?.id ?? null
+      if (!priceId || !ALLOWED_PRICE_IDS.has(priceId)) {
+        logEvent(event, 'unsupported_subscription_price')
+        return new Response('OK', { status: 200 })
+      }
+
+      const latestInvoice =
+        subscription.latest_invoice &&
+        typeof subscription.latest_invoice === 'object'
+          ? (subscription.latest_invoice as Stripe.Invoice)
+          : null
+
+      const { data, error } = await supabase.rpc(
+        'process_stripe_subscription_event',
+        {
+          p_event_id: event.id,
+          p_event_type: event.type,
+          p_subscription_id: subscription.id,
+          p_coach_id: profile.id,
+          p_invoice_id: latestInvoice?.id ?? null,
+          p_price_id: priceId,
+          p_status:
+            event.type === 'customer.subscription.deleted'
+              ? 'canceled'
+              : subscription.status,
+          p_current_period_start: unixToIso(
+            subscription.current_period_start
+          ),
+          p_current_period_end: unixToIso(subscription.current_period_end),
+          p_cancel_at_period_end:
+            event.type === 'customer.subscription.deleted'
+              ? false
+              : subscription.cancel_at_period_end ?? false,
+          p_canceled_at: unixToIso(subscription.canceled_at),
+          p_amount_paid: latestInvoice?.amount_paid ?? null,
+          p_invoice_status: latestInvoice?.status ?? null,
+          p_event_created: unixToIso(event.created),
+          p_stripe_customer_id: stripeCustomerId,
+        }
+      )
+
+      if (error) {
+        logEvent(event, `rpc_error_${error.code ?? 'unknown'}`)
+        return new Response('Internal Server Error', { status: 500 })
+      }
+
+      if (!isValidResult(data)) {
+        logEvent(event, 'invalid_rpc_result')
+        return new Response('Internal Server Error', { status: 500 })
+      }
+
+      logEvent(event, data.status ?? 'processed')
       return new Response('OK', { status: 200 })
     }
-    if (paymentStatus !== 'paid' && paymentStatus !== 'no_payment_required') {
+
+    if (
+      event.type === 'invoice.paid' ||
+      event.type === 'invoice.payment_failed'
+    ) {
+      const invoice = event.data.object as Stripe.Invoice
+      const subscriptionId = objectId(invoice.subscription)
+
+      // Les factures sans abonnement ne relèvent pas de ce cycle de vie.
+      if (!subscriptionId) {
+        logEvent(event, 'ignored_non_subscription_invoice')
+        return new Response('OK', { status: 200 })
+      }
+
+      const invoiceCustomerId = objectId(invoice.customer)
+      if (!invoiceCustomerId) {
+        logEvent(event, 'missing_invoice_customer')
+        return new Response('Internal Server Error', { status: 500 })
+      }
+
+      let subscription: Stripe.Subscription
+      try {
+        subscription = await stripe.subscriptions.retrieve(subscriptionId)
+      } catch {
+        logEvent(event, 'subscription_retrieve_error')
+        return new Response('Internal Server Error', { status: 500 })
+      }
+
+      const subscriptionCustomerId = objectId(subscription.customer)
+      if (
+        !subscriptionCustomerId ||
+        subscriptionCustomerId !== invoiceCustomerId
+      ) {
+        logEvent(event, 'invoice_subscription_customer_mismatch')
+        return new Response('Internal Server Error', { status: 500 })
+      }
+
+      const metadataCoachId = subscription.metadata?.coachId ?? null
+      if (metadataCoachId && !UUID_REGEX.test(metadataCoachId)) {
+        logEvent(event, 'invalid_coach_metadata')
+        return new Response('Internal Server Error', { status: 500 })
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, stripe_customer_id, stripe_subscription_id')
+        .eq('stripe_customer_id', invoiceCustomerId)
+        .maybeSingle()
+
+      if (profileError) {
+        logEvent(event, 'profile_lookup_error')
+        return new Response('Internal Server Error', { status: 500 })
+      }
+
+      if (!profile || !UUID_REGEX.test(profile.id)) {
+        logEvent(event, 'profile_unmapped')
+        return new Response('Internal Server Error', { status: 500 })
+      }
+
+      if (metadataCoachId && metadataCoachId !== profile.id) {
+        logEvent(event, 'profile_metadata_mismatch')
+        return new Response('Internal Server Error', { status: 500 })
+      }
+
+      if (
+        profile.stripe_subscription_id &&
+        profile.stripe_subscription_id !== subscriptionId
+      ) {
+        logEvent(event, 'profile_subscription_mismatch')
+        return new Response('Internal Server Error', { status: 500 })
+      }
+
+      const priceId = subscription.items.data[0]?.price?.id ?? null
+      if (!priceId || !ALLOWED_PRICE_IDS.has(priceId)) {
+        logEvent(event, 'unsupported_subscription_price')
+        return new Response('OK', { status: 200 })
+      }
+
+      if (!invoice.status) {
+        logEvent(event, 'missing_invoice_status')
+        return new Response('Internal Server Error', { status: 500 })
+      }
+
+      const { data, error } = await supabase.rpc(
+        'process_stripe_subscription_event',
+        {
+          p_event_id: event.id,
+          p_event_type: event.type,
+          p_subscription_id: subscriptionId,
+          p_coach_id: profile.id,
+          p_invoice_id: invoice.id,
+          p_price_id: priceId,
+          p_status: subscription.status,
+          p_current_period_start: unixToIso(
+            subscription.current_period_start
+          ),
+          p_current_period_end: unixToIso(subscription.current_period_end),
+          p_cancel_at_period_end:
+            subscription.cancel_at_period_end ?? false,
+          p_canceled_at: unixToIso(subscription.canceled_at),
+          p_amount_paid: invoice.amount_paid,
+          p_invoice_status: invoice.status,
+          p_event_created: unixToIso(event.created),
+          p_stripe_customer_id: invoiceCustomerId,
+        }
+      )
+
+      if (error) {
+        logEvent(event, `rpc_error_${error.code ?? 'unknown'}`)
+        return new Response('Internal Server Error', { status: 500 })
+      }
+
+      if (!isValidResult(data)) {
+        logEvent(event, 'invalid_rpc_result')
+        return new Response('Internal Server Error', { status: 500 })
+      }
+
+      logEvent(event, data.status ?? 'processed')
       return new Response('OK', { status: 200 })
     }
-    // Traiter si payment_status = paid OU no_payment_required (avec amount_total = 0 pour tests promo)
-    if (paymentStatus === 'no_payment_required' && session.amount_total !== 0) {
+
+    const session = event.data.object as Stripe.Checkout.Session
+
+    // Compatibilité avec les anciennes Sessions (userId) et les nouvelles
+    // Sessions authentifiées (coachId).
+    const coachId = session.metadata?.coachId ?? session.metadata?.userId
+    if (!coachId || !UUID_REGEX.test(coachId)) {
+      logEvent(event, 'invalid_checkout_coach')
       return new Response('OK', { status: 200 })
     }
-  }
 
-  // Appeler la fonction RPC idempotente et atomique
-  const { data, error } = await supabase.rpc('process_stripe_checkout_event', {
-    p_event_id: event.id,
-    p_event_type: event.type,
-    p_checkout_session_id: session.id,
-    p_coach_id: userId as string,
-    p_price_id: priceId,
-    p_stripe_customer_id: stripeCustomerId,
-  })
+    let lineItems: Stripe.ApiList<Stripe.LineItem>
+    try {
+      lineItems = await stripe.checkout.sessions.listLineItems(session.id, {
+        limit: 2,
+      })
+    } catch {
+      logEvent(event, 'line_items_retrieve_error')
+      return new Response('Internal Server Error', { status: 500 })
+    }
 
-  if (error) {
-    console.log(`[stripe-webhook] ${event.id}: RPC error - code=${error.code}`)
+    if (lineItems.data.length !== 1) {
+      logEvent(event, 'unexpected_line_items_count')
+      return new Response('OK', { status: 200 })
+    }
+
+    const lineItem = lineItems.data[0]
+    if (lineItem.quantity !== 1) {
+      logEvent(event, 'unexpected_quantity')
+      return new Response('OK', { status: 200 })
+    }
+
+    const priceId = lineItem.price?.id
+    if (!priceId || !ALLOWED_PRICE_IDS.has(priceId)) {
+      logEvent(event, 'unsupported_checkout_price')
+      return new Response('OK', { status: 200 })
+    }
+
+    const stripeCustomerId = objectId(session.customer)
+
+    if (event.type === 'checkout.session.completed') {
+      const paymentStatus = session.payment_status
+      if (paymentStatus === 'unpaid') {
+        return new Response('OK', { status: 200 })
+      }
+      if (paymentStatus !== 'paid' && paymentStatus !== 'no_payment_required') {
+        return new Response('OK', { status: 200 })
+      }
+      if (paymentStatus === 'no_payment_required' && session.amount_total !== 0) {
+        return new Response('OK', { status: 200 })
+      }
+    }
+
+    const { data, error } = await supabase.rpc(
+      'process_stripe_checkout_event',
+      {
+        p_event_id: event.id,
+        p_event_type: event.type,
+        p_checkout_session_id: session.id,
+        p_coach_id: coachId,
+        p_price_id: priceId,
+        p_stripe_customer_id: stripeCustomerId,
+      }
+    )
+
+    if (error) {
+      logEvent(event, `rpc_error_${error.code ?? 'unknown'}`)
+      return new Response('Internal Server Error', { status: 500 })
+    }
+
+    if (!isValidResult(data)) {
+      logEvent(event, 'invalid_rpc_result')
+      return new Response('Internal Server Error', { status: 500 })
+    }
+
+    logEvent(event, data.status ?? 'processed')
+    return new Response('OK', { status: 200 })
+  } catch {
+    logEvent(event, 'unhandled_processing_error')
     return new Response('Internal Server Error', { status: 500 })
   }
-
-  // Vérifier la validité du résultat de la RPC
-  type StripeProcessResult = {
-    ok?: boolean
-    status?: string
-    remaining?: number
-  }
-
-  const result = data as StripeProcessResult | null
-
-  if (!data || typeof data !== 'object' || result.ok !== true) {
-    console.log(`[stripe-webhook] ${event.id}: invalid RPC result`)
-    return new Response('Internal Server Error', { status: 500 })
-  }
-
-  console.log(`[stripe-webhook] ${event.id}: ${result.status ?? 'processed'}`)
-
-  return new Response('OK', { status: 200 })
 }
 
 export const config = { path: '/api/stripe-webhook' }

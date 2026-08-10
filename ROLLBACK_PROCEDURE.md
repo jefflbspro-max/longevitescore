@@ -1,41 +1,91 @@
-# Procédure de rollback
+# Procédure de rollback Stripe Subscriptions
 
-## Avertissement
+## Principe
 
-La migration `down` supprime les tables techniques `stripe_subscriptions` et `stripe_invoice_events` ainsi que leur historique complet. Elle supprime également les colonnes ajoutées à `profiles`.
+La migration `supabase/migrations/20260803_stripe_subscriptions_down.sql`
+est **non destructive par défaut**.
 
-**Cette opération est irréversible.** Toute donnée d'abonnement enregistrée sera perdue.
+Elle effectue uniquement les opérations suivantes :
+
+- révocation du droit d'exécuter `process_stripe_subscription_event` ;
+- suppression de cette RPC ;
+- révocation des droits `INSERT` et `UPDATE` du `service_role` sur les tables techniques.
+
+Elle conserve volontairement :
+
+- `stripe_subscriptions` et leur historique ;
+- `stripe_invoice_events` et leur historique ;
+- les colonnes Stripe ajoutées à `profiles` ;
+- les index et les données existantes.
+
+La suppression physique des données n'appartient pas au rollback standard. Elle
+doit rester une opération manuelle, sauvegardée et réservée à un environnement
+de test jetable.
 
 ---
 
-## Procédure de rollback
+## Ordre obligatoire du rollback
 
-### Étape 1 : Accéder au projet Supabase de test
+Le webhook déployé appelle la RPC d'abonnement. Il faut donc retirer le nouveau
+code **avant** de supprimer la RPC, sinon les événements Stripe concernés
+recevront des réponses HTTP 500.
 
-1. Connecte-toi au dashboard Supabase du projet de test
-2. Va dans **SQL Editor**
+### Étape 1 : arrêter le nouveau traitement
 
-### Étape 2 : Exécuter la migration `down`
+Choisir une seule méthode :
 
-1. Ouvre le fichier `supabase/migrations/20260803_stripe_subscriptions_down.sql`
-2. Copie le contenu complet
-3. Colle-le dans l'éditeur SQL de Supabase
-4. Exécute le script
+1. restaurer dans Netlify le déploiement de production antérieur à la Pull
+   Request Stripe Subscriptions ; ou
+2. désactiver temporairement, dans la destination Stripe, les événements :
+   - `customer.subscription.updated` ;
+   - `customer.subscription.deleted` ;
+   - `invoice.paid` ;
+   - `invoice.payment_failed`.
 
-### Étape 3 : Vérifier le rollback
+Ne pas supprimer la destination webhook complète, car elle traite également les
+événements Checkout.
 
-Exécute les requêtes suivantes pour confirmer que les tables et colonnes ont été supprimées :
+### Étape 2 : exécuter le rollback SQL
+
+1. Ouvrir le bon projet Supabase et confirmer son environnement.
+2. Ouvrir **SQL Editor**.
+3. Copier le contenu complet de
+   `supabase/migrations/20260803_stripe_subscriptions_down.sql`.
+4. Exécuter le script une seule fois.
+5. Conserver la sortie et l'heure de l'opération dans le journal d'incident.
+
+### Étape 3 : vérifier la désactivation
+
+La RPC doit être absente :
 
 ```sql
--- Vérifier que les tables ont été supprimées
-SELECT table_name
-FROM information_schema.tables
-WHERE table_schema = 'public'
-  AND table_name IN ('stripe_subscriptions', 'stripe_invoice_events');
+SELECT to_regprocedure(
+  'public.process_stripe_subscription_event(text,text,text,uuid,text,text,text,timestamp with time zone,timestamp with time zone,boolean,timestamp with time zone,integer,text,timestamp with time zone,text)'
+) IS NULL AS rpc_removed;
+```
 
--- Ce résultat doit être VIDE
+Résultat attendu : `rpc_removed = true`.
 
--- Vérifier que les colonnes ont été supprimées de profiles
+Les données doivent être conservées :
+
+```sql
+SELECT
+  to_regclass('public.stripe_subscriptions') IS NOT NULL
+    AS subscriptions_table_preserved,
+  to_regclass('public.stripe_invoice_events') IS NOT NULL
+    AS invoice_events_table_preserved,
+  (SELECT COUNT(*) FROM public.stripe_subscriptions)
+    AS subscription_rows_preserved,
+  (SELECT COUNT(*) FROM public.stripe_invoice_events)
+    AS invoice_rows_preserved;
+```
+
+Les deux tables doivent être présentes. Les nombres de lignes doivent être
+comparés aux valeurs relevées avant le rollback.
+
+Les colonnes de profil doivent également rester présentes :
+
+```sql
 SELECT column_name
 FROM information_schema.columns
 WHERE table_schema = 'public'
@@ -47,61 +97,65 @@ WHERE table_schema = 'public'
     'current_period_end',
     'cancel_at_period_end',
     'last_event_created'
-  );
-
--- Ce résultat doit être VIDE
+  )
+ORDER BY column_name;
 ```
 
-### Étape 4 : Vérifier que la fonction RPC a été supprimée
-
-```sql
-SELECT proname
-FROM pg_proc p
-JOIN pg_namespace n ON n.oid = p.pronamespace
-WHERE n.nspname = 'public'
-  AND p.proname = 'process_stripe_subscription_event';
-
--- Ce résultat doit être VIDE
-```
+Résultat attendu : six lignes.
 
 ---
 
-## Rollback en cas de problème en production
+## Réactivation après correction
 
-**⚠️ ATTENTION ⚠️**
+Pour réactiver le traitement :
 
-En cas de problème en production, la procédure de rollback est la même, mais avec des conséquences plus graves :
+1. corriger le code et la migration dans une branche dédiée ;
+2. exécuter `supabase/migrations/20260803_stripe_subscriptions.sql` ;
+3. exécuter `verify_stripe_subscriptions.sql` ;
+4. redéployer le webhook corrigé ;
+5. réactiver les quatre événements Stripe s'ils avaient été désactivés ;
+6. renvoyer un événement déjà traité et vérifier l'idempotence ;
+7. surveiller les réponses Stripe et les logs Netlify.
 
-1. Les données d'abonnement seront perdues
-2. Les profils perdront les colonnes d'abonnement
-3. La fonction RPC ne sera plus disponible
-4. Les webhooks Stripe échoueront car la fonction n'existera plus
+---
 
-### Procédure d'urgence en production
+## Incident de production
 
-1. **Arrêter immédiatement** tout traitement webhook
-2. **Restaurer la base de données** depuis la dernière sauvegarde Supabase
-3. **Ne pas exécuter la migration `down`** en production (utiliser la restauration)
-4. **Corriger la migration** dans un environnement de test
-5. **Re-valider** tous les scénarios
-6. **Re-déployer** uniquement après validation complète
+En production :
+
+1. noter l'heure, le commit et les événements concernés ;
+2. vérifier qu'une sauvegarde Supabase récente existe ;
+3. restaurer d'abord le déploiement Netlify précédent ;
+4. exécuter ensuite la migration `down` non destructive si la RPC doit être
+   neutralisée ;
+5. ne jamais supprimer manuellement les tables ou colonnes pendant l'incident ;
+6. conserver les événements Stripe en échec pour permettre leur renvoi après
+   correction ;
+7. vérifier l'absence de double effet métier avant de clôturer l'incident.
+
+Une restauration complète de la base n'est nécessaire que si des données ont
+été réellement corrompues. Elle n'est pas requise pour désactiver simplement la
+RPC.
 
 ---
 
 ## Bonnes pratiques
 
-- Toujours tester le rollback dans l'environnement de test avant toute migration en production
-- Garder une sauvegarde de la base de données avant chaque migration
-- Ne jamais exécuter la migration `down` en production sans restauration préalable
-- Documenter chaque rollback et ses raisons
+- Sauvegarder la base avant toute migration sensible.
+- Exécuter les migrations dans une transaction lorsque cela est possible.
+- Ne jamais lancer un nettoyage destructif sans export préalable et validation
+  explicite de l'environnement.
+- Documenter le commit, l'heure, l'opérateur et la raison du rollback.
+- Vérifier le nombre de lignes avant et après l'opération.
+- Ne pas supprimer les branches de sauvegarde avant la fin de la surveillance.
 
 ---
 
 ## Fichiers associés
 
-- `supabase/migrations/20260803_stripe_subscriptions_down.sql` — migration de rollback
-- `supabase/migrations/20260803_stripe_subscriptions.sql` — migration `up`
-- `TEST_ENVIRONMENT_SETUP.md` — configuration de l'environnement de test
-- `STRIPE_TEST_MODE_CHECKLIST.md` — checklist de configuration Stripe
-- `verify_stripe_subscriptions.sql` — requêtes de vérification post-migration
-- `STRIPE_SUBSCRIPTION_TESTS.md` — scénarios de test détaillés
+- `supabase/migrations/20260803_stripe_subscriptions_down.sql` : rollback non destructif ;
+- `supabase/migrations/20260803_stripe_subscriptions.sql` : migration d'activation ;
+- `verify_stripe_subscriptions.sql` : vérifications post-migration ;
+- `TEST_ENVIRONMENT_SETUP.md` : environnement de test ;
+- `STRIPE_TEST_MODE_CHECKLIST.md` : configuration Stripe Test ;
+- `STRIPE_SUBSCRIPTION_TESTS.md` : scénarios fonctionnels.

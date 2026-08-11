@@ -1704,9 +1704,10 @@ ${client.objectif ? '<div style="background:rgba(196,168,130,.06);border:1px sol
 }
 function computeSessionBodyComp(data) {
   try {
-    if (!data || !data.client || !data.plis2)
+    const c = data?.clientForm || data?.client;
+    if (!c || !data?.plis2)
       return null;
-    const { client: c, plis2: p } = data;
+    const p = data.plis2;
     const age = parseInt(c.age) || 30, genre = c.genre || "homme", taille = parseInt(c.taille) || 170;
     const poids = parseFloat(p.poids);
     if (!poids || isNaN(poids))
@@ -1752,9 +1753,10 @@ function computeSessionBodyComp(data) {
 }
 function computeSessionTestValues(data) {
   try {
-    if (!data || !data.client)
+    const c = data?.clientForm || data?.client;
+    if (!c)
       return {};
-    const c = data.client, age = parseInt(c.age) || 30, genre = c.genre || "homme";
+    const age = parseInt(c.age) || 30, genre = c.genre || "homme";
     const r1 = data.t1 ? calcT1(data.t1, age, genre) : null;
     const r2 = data.t2 ? calcT2(data.t2) : null;
     const r3 = data.t3 ? calcT3(data.t3) : null;
@@ -2046,6 +2048,80 @@ function BilanClient() {
   const pendingSaveRef = React.useRef(null);
   const authorizedAssessmentRef = React.useRef(null);
   const saveTimeoutRef = React.useRef(null);
+  const currentClientIdRef = React.useRef(null);
+  const currentClientNameRef = React.useRef("");
+  const pendingDeletesRef = React.useRef(new Map());
+  const cacheOwnerRef = React.useRef(null);
+  const pendingRetryOwnerRef = React.useRef(null);
+  const pendingRetryTimeoutRef = React.useRef(null);
+  const lastSyncSequenceRef = React.useRef(0);
+  const [syncVersion, setSyncVersion] = useState(0);
+  const isUuid = (value) => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+  const cacheKey = (suffix) => {
+    if (!cacheOwnerRef.current)
+      throw new Error("cache_owner_unavailable");
+    return `longevite:${cacheOwnerRef.current}:${suffix}`;
+  };
+  const readCacheIndex = () => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(cacheKey("bilan_index")) || "[]");
+      const prefix = `longevite:${cacheOwnerRef.current}:bilan_`;
+      return Array.isArray(parsed) ? parsed.filter((entry) => entry && typeof entry.key === "string" && entry.key.startsWith(prefix)) : [];
+    } catch (_error) {
+      return [];
+    }
+  };
+  const writeCacheIndex = (index) => {
+    localStorage.setItem(cacheKey("bilan_index"), JSON.stringify(Array.isArray(index) ? index.slice(0, 500) : []));
+  };
+  const initializeCacheOwner = (ownerId) => {
+    if (!isUuid(ownerId))
+      return false;
+    if (cacheOwnerRef.current === ownerId)
+      return true;
+    clearTimeout(pendingRetryTimeoutRef.current);
+    clearTimeout(saveTimeoutRef.current);
+    pendingRetryOwnerRef.current = null;
+    cacheOwnerRef.current = ownerId;
+    pendingSaveRef.current = null;
+    setRemoteSaveStatus("idle");
+    pendingDeletesRef.current.clear();
+    authorizedAssessmentRef.current = null;
+    const migrationMarker = "longevite:legacy_cache_owner_v2";
+    if (!localStorage.getItem(migrationMarker)) {
+      let legacyIndex = [];
+      try {
+        const parsed = JSON.parse(localStorage.getItem("bilan_index") || "[]");
+        if (Array.isArray(parsed)) legacyIndex = parsed;
+      } catch (_error) {}
+      const migratedIndex = [];
+      legacyIndex.forEach((entry) => {
+        if (!entry || typeof entry.key !== "string" || !entry.key.startsWith("bilan_"))
+          return;
+        const raw = localStorage.getItem(entry.key);
+        if (!raw) return;
+        const scopedKey = cacheKey(entry.key);
+        localStorage.setItem(scopedKey, raw);
+        migratedIndex.push({ ...entry, key: scopedKey });
+        localStorage.removeItem(entry.key);
+      });
+      if (migratedIndex.length)
+        writeCacheIndex(migratedIndex);
+      const legacyPending = localStorage.getItem("bilan_pending_save");
+      if (legacyPending)
+        localStorage.setItem(cacheKey("bilan_pending_save"), legacyPending);
+      localStorage.removeItem("bilan_index");
+      localStorage.removeItem("bilan_pending_save");
+      localStorage.setItem(migrationMarker, ownerId);
+    }
+    return true;
+  };
+  React.useEffect(() => {
+    if (!String(client.prenom || "").trim() && !String(client.nom || "").trim()) {
+      currentClientIdRef.current = null;
+      currentClientNameRef.current = "";
+    }
+  }, [client.prenom, client.nom]);
   const [evoClient, setEvoClient] = useState("");
   const [client, setClient] = useState({ prenom: "", nom: "", age: "", taille: "", genre: "homme", profession: "", date: (/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR"), objectif: "" });
   const [plis2, setPlis] = useState({ pec: "", ax: "", tri: "", sub: "", abd: "", sup: "", cui: "", poids: "", bic: "", mode4: false, tailleTour: "", hanches: "", morphotype: "moyen" });
@@ -2187,6 +2263,7 @@ function BilanClient() {
       window.parent.postMessage({
         source: "longevite-bilan",
         type: "BILAN_OUTPUT_DONE",
+        ownerId: cacheOwnerRef.current,
         assessmentId
       }, window.location.origin);
     }
@@ -2207,46 +2284,50 @@ function BilanClient() {
     doDownload(`Bilan_${client.prenom || "client"}_${client.nom || ""}.html`);
     setTimeout(notifyOutputDone, 500);
   };
-  const commitPendingSave = (pending) => {
+  const commitPendingSave = (pending, result = {}) => {
     try {
       if (!pending?.assessmentId || !pending?.data)
         return;
-      const key = `bilan_${pending.assessmentId}`;
-      const alreadySaved = localStorage.getItem(key) !== null;
-      if (!alreadySaved) {
-        localStorage.setItem(key, JSON.stringify(pending.data));
-        const index = JSON.parse(localStorage.getItem("bilan_index") || "[]");
-        index.unshift({
-          key,
-          label: pending.data.label,
-          savedAt: pending.data.savedAt,
-          period: pending.data.period,
-          fullName: pending.data.fullName,
-          globalScore: pending.data.globalScore
-        });
-        localStorage.setItem("bilan_index", JSON.stringify(index.slice(0, 50)));
-      }
-      localStorage.removeItem("bilan_pending_save");
+      const key = cacheKey(`bilan_${pending.assessmentId}`);
+      const persistedData = {
+        ...pending.data,
+        remoteConfirmed: true,
+        serverRevision: result.revision || pending.data.serverRevision || 1
+      };
+      localStorage.setItem(key, JSON.stringify(persistedData));
+      const index = readCacheIndex().filter((entry) => entry.key !== key);
+      index.unshift({
+        key,
+        label: persistedData.label,
+        savedAt: persistedData.savedAt,
+        period: persistedData.period,
+        fullName: persistedData.fullName,
+        globalScore: persistedData.globalScore
+      });
+      writeCacheIndex(index);
+      localStorage.removeItem(cacheKey("bilan_pending_save"));
       pendingSaveRef.current = null;
       authorizedAssessmentRef.current = pending.assessmentId;
       clearTimeout(saveTimeoutRef.current);
       setRemoteSaveStatus("idle");
       setShowSavePeriodModal(false);
+      setSyncVersion((version) => version + 1);
       if (window.parent !== window) {
         window.parent.postMessage({
           source: "longevite-bilan",
           type: "BILAN_SAVE_COMMITTED",
+          ownerId: cacheOwnerRef.current,
           assessmentId: pending.assessmentId
         }, window.location.origin);
       }
-      alert(`✅ Bilan enregistré : ${pending.data.label}`);
+      alert(`✅ Bilan enregistré : ${persistedData.label}`);
     } catch (e) {
       setRemoteSaveStatus("idle");
-      alert("Erreur de sauvegarde locale : " + e);
+      alert("Le bilan est enregistré dans Supabase mais le cache local n’a pas pu être actualisé. Rechargez la page pour le synchroniser.");
     }
   };
   const requestCreditForPendingSave = (pending) => {
-    if (!pending?.assessmentId)
+    if (!pending?.assessmentId || !pending?.clientId || !pending?.data)
       return;
     if (window.parent === window) {
       setRemoteSaveStatus("idle");
@@ -2257,61 +2338,195 @@ function BilanClient() {
     window.parent.postMessage({
       source: "longevite-bilan",
       type: "BILAN_SAVE_REQUEST",
+      ownerId: cacheOwnerRef.current,
       assessmentId: pending.assessmentId,
-      clientName: pending.data.fullName,
-      period: pending.data.period
+      clientId: pending.clientId,
+      client: pending.client,
+      period: pending.data.period,
+      payload: pending.data,
+      schemaVersion: pending.data.schemaVersion,
+      scoringVersion: pending.data.scoringVersion
     }, window.location.origin);
     clearTimeout(saveTimeoutRef.current);
     saveTimeoutRef.current = setTimeout(() => {
       setRemoteSaveStatus("idle");
-      alert("La validation du crédit prend trop de temps. Le bilan n’a pas été perdu : réessayez d’enregistrer lorsque la connexion est rétablie.");
-    }, 15000);
+      alert("La sauvegarde Supabase prend trop de temps. Le bilan n’a pas été perdu : réessayez lorsque la connexion est rétablie.");
+    }, 15e3);
   };
   React.useEffect(() => {
-    const handleSaveResult = (event) => {
-      if (event.origin !== window.location.origin)
+    const handlePlatformMessage = (event) => {
+      if (event.origin !== window.location.origin || event.source !== window.parent)
         return;
       const message = event.data;
-      if (!message || message.source !== "longevite-platform" || message.type !== "BILAN_SAVE_RESULT")
+      if (!message || message.source !== "longevite-platform")
+        return;
+      if (message.type === "BILAN_SYNC_RESULT") {
+        const syncSequence = Number(message.syncSequence);
+        if (!Number.isInteger(syncSequence) || syncSequence <= lastSyncSequenceRef.current)
+          return;
+        lastSyncSequenceRef.current = syncSequence;
+        if (!initializeCacheOwner(message.ownerId))
+          return;
+        if (pendingRetryOwnerRef.current !== message.ownerId) {
+          pendingRetryOwnerRef.current = message.ownerId;
+          try {
+            const raw = localStorage.getItem(cacheKey("bilan_pending_save"));
+            if (raw) {
+              const pending = JSON.parse(raw);
+              pendingSaveRef.current = pending;
+              pendingRetryTimeoutRef.current = setTimeout(() => {
+                if (cacheOwnerRef.current === message.ownerId)
+                  requestCreditForPendingSave(pending);
+              }, 800);
+            }
+          } catch (_error) {
+            localStorage.removeItem(cacheKey("bilan_pending_save"));
+          }
+        }
+        if (message.ok !== true || !Array.isArray(message.records))
+          return;
+        try {
+          let index = readCacheIndex();
+          const officialByPeriod = new Map();
+          const tombstoneIds = new Set();
+          message.records.forEach((record) => {
+            if (!record?.assessmentId)
+              return;
+            if (record.status === "finalized" && record.clientId && record.payload) {
+              const periodKey = `${record.clientId}:${record.period}`;
+              const current = officialByPeriod.get(periodKey);
+              if (!current || Number(record.revision || 0) > Number(current.revision || 0) || Number(record.revision || 0) === Number(current.revision || 0) && String(record.updatedAt || "") > String(current.updatedAt || ""))
+                officialByPeriod.set(periodKey, record);
+            } else if (record.status === "superseded" || record.status === "archived") {
+              tombstoneIds.add(record.assessmentId);
+            }
+          });
+          index = index.filter((entry) => {
+            try {
+              const cached = JSON.parse(localStorage.getItem(entry.key) || "{}");
+              if (tombstoneIds.has(cached.assessmentId)) {
+                localStorage.removeItem(entry.key);
+                return false;
+              }
+              if (cached.schemaVersion !== 2 || !cached.clientId)
+                return true;
+              const official = officialByPeriod.get(`${cached.clientId}:${cached.period}`);
+              if (!official || official.assessmentId === cached.assessmentId)
+                return true;
+              localStorage.removeItem(entry.key);
+              return false;
+            } catch (_error) {
+              return true;
+            }
+          });
+          message.records.forEach((record) => {
+            if (record?.status !== "finalized" || !record?.assessmentId || !record?.payload || !record?.clientId)
+              return;
+            const official = officialByPeriod.get(`${record.clientId}:${record.period}`);
+            if (!official || official.assessmentId !== record.assessmentId)
+              return;
+            const payload = {
+              ...record.payload,
+              assessmentId: record.assessmentId,
+              clientId: record.clientId,
+              period: record.period,
+              remoteConfirmed: true,
+              serverRevision: record.revision,
+              serverUpdatedAt: record.updatedAt
+            };
+            const key = cacheKey(`bilan_${record.assessmentId}`);
+            localStorage.setItem(key, JSON.stringify(payload));
+            index = index.filter((entry) => entry.key !== key);
+            index.unshift({
+              key,
+              label: payload.label,
+              savedAt: payload.savedAt,
+              period: payload.period,
+              fullName: payload.fullName,
+              globalScore: payload.globalScore
+            });
+          });
+          index.sort((a, b) => String(b.savedAt || "").localeCompare(String(a.savedAt || "")));
+          writeCacheIndex(index);
+          setSyncVersion((version) => version + 1);
+          if (message.truncated)
+            console.warn("Seuls les 1 000 bilans les plus récents sont synchronisés dans ce navigateur.");
+        } catch (error) {
+          console.warn("Synchronisation locale impossible", error);
+        }
+        return;
+      }
+      if (message.type === "BILAN_ARCHIVE_RESULT") {
+        if (message.ownerId !== cacheOwnerRef.current)
+          return;
+        const pendingDelete = pendingDeletesRef.current.get(message.assessmentId);
+        if (!pendingDelete)
+          return;
+        if (message.ok) {
+          localStorage.removeItem(pendingDelete.localKey);
+          writeCacheIndex(readCacheIndex().filter((entry) => entry.key !== pendingDelete.localKey));
+          pendingDeletesRef.current.delete(message.assessmentId);
+          setSyncVersion((version) => version + 1);
+        } else {
+          pendingDeletesRef.current.delete(message.assessmentId);
+          alert(message.message || "Archivage Supabase impossible.");
+        }
+        return;
+      }
+      if (message.type !== "BILAN_SAVE_RESULT")
         return;
       const pending = pendingSaveRef.current;
-      if (!pending || message.assessmentId !== pending.assessmentId)
+      if (message.ownerId !== cacheOwnerRef.current || !pending || message.assessmentId !== pending.assessmentId)
         return;
       clearTimeout(saveTimeoutRef.current);
       if (message.ok) {
-        commitPendingSave(pending);
+        commitPendingSave(pending, message);
       } else {
         setRemoteSaveStatus("idle");
-        const reason = message.status === "quota_exhausted" ? "Aucun crédit bilan disponible. Rechargez un bilan pour enregistrer ce client." : message.message || "La plateforme n’a pas pu valider ce bilan.";
+        const reason = message.status === "quota_exhausted" || message.status === "no_credit" ? "Aucun crédit bilan disponible. Rechargez un bilan pour enregistrer ce client." : message.message || "La plateforme n’a pas pu enregistrer ce bilan.";
         alert("⛔ " + reason);
       }
     };
-    window.addEventListener("message", handleSaveResult);
-    try {
-      const raw = localStorage.getItem("bilan_pending_save");
-      if (raw) {
-        const pending = JSON.parse(raw);
-        pendingSaveRef.current = pending;
-        setTimeout(() => requestCreditForPendingSave(pending), 800);
-      }
-    } catch (_e) {
-      localStorage.removeItem("bilan_pending_save");
-    }
+    window.addEventListener("message", handlePlatformMessage);
+    window.parent.postMessage({
+      source: "longevite-bilan",
+      type: "BILAN_SYNC_REQUEST"
+    }, window.location.origin);
     return () => {
-      window.removeEventListener("message", handleSaveResult);
+      window.removeEventListener("message", handlePlatformMessage);
       clearTimeout(saveTimeoutRef.current);
+      clearTimeout(pendingRetryTimeoutRef.current);
     };
   }, []);
+  const randomUuid = () => globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : `xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx`.replace(/[xy]/g, (char) => {
+    const value = globalThis.crypto?.getRandomValues ? globalThis.crypto.getRandomValues(new Uint8Array(1))[0] & 15 : Math.random() * 16 | 0;
+    return (char === "x" ? value : value & 3 | 8).toString(16);
+  });
+  const normalizeClientName = (value) => String(value || "").normalize("NFKD").toLocaleLowerCase("fr").replace(/[^\p{L}\p{N}]/gu, "");
   const saveSession = (period) => {
     try {
       if (remoteSaveStatus === "pending")
         return;
+      if (!cacheOwnerRef.current) {
+        alert("La session coach est encore en cours d’initialisation. Réessayez dans quelques secondes.");
+        return;
+      }
       if (pendingSaveRef.current) {
         requestCreditForPendingSave(pendingSaveRef.current);
         return;
       }
-      const assessmentId = globalThis.crypto && "randomUUID" in globalThis.crypto ? globalThis.crypto.randomUUID() : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      const fullName = `${client.prenom || "Client"} ${client.nom || ""}`.trim();
+      const rawName = `${client.prenom || ""} ${client.nom || ""}`.trim();
+      if (!rawName) {
+        alert("Renseignez le prénom ou le nom du client avant d’enregistrer.");
+        return;
+      }
+      const normalizedName = normalizeClientName(rawName);
+      if (!currentClientIdRef.current || currentClientNameRef.current && currentClientNameRef.current !== normalizedName)
+        currentClientIdRef.current = randomUuid();
+      currentClientNameRef.current = normalizedName;
+      const clientId = currentClientIdRef.current;
+      const assessmentId = randomUuid();
+      const fullName = rawName;
       const label = `${fullName} · ${period} · ${client.date}`.trim();
       const savedScores = {
         t1: t1r?.score ?? null,
@@ -2323,12 +2538,57 @@ function BilanClient() {
         t7: t7r?.score ?? null,
         t8: t8r?.score ?? null
       };
-      const sc = [t1r, t2r, t3r, t4r, t5r, t6r, t7r, t8r].filter(Boolean).map((r) => r.score);
-      const globalScore = sc.length ? Math.round(sc.reduce((a, b) => a + b, 0) / sc.length) : 0;
-      const data = { client, plis2, t1, t1b, t2, t3, t4, t5, t6, t7, t8, label, savedAt: new Date().toISOString(), period, fullName, scores: savedScores, globalScore, assessmentId };
-      const pending = { assessmentId, data };
+      const functionalValues = Object.values(savedScores).filter((score) => Number.isFinite(score));
+      const compositionScore = Number(plisRes?.score);
+      if (functionalValues.length !== 8 || !Number.isFinite(compositionScore)) {
+        alert("Complétez la composition corporelle et les huit tests avant d’enregistrer un bilan officiel.");
+        return;
+      }
+      const functionalScore = Math.round(functionalValues.reduce((sum, score) => sum + score, 0) / functionalValues.length);
+      const globalScore = avgScore2;
+      const savedAt = new Date().toISOString();
+      const canonicalClient = {
+        firstName: client.prenom || "",
+        lastName: client.nom || "",
+        displayName: fullName
+      };
+      const data = {
+        client: canonicalClient,
+        clientForm: client,
+        plis2,
+        t1,
+        t1b,
+        t2,
+        t3,
+        t4,
+        t5,
+        t6,
+        t7,
+        t8,
+        label,
+        savedAt,
+        period,
+        fullName,
+        scores: savedScores,
+        scoreSummary: {
+          functional: functionalScore,
+          composition: compositionScore,
+          global: globalScore
+        },
+        globalScore,
+        assessmentId,
+        clientId,
+        schemaVersion: 2,
+        scoringVersion: "longevite-v2-composition"
+      };
+      const pending = {
+        assessmentId,
+        clientId,
+        client: canonicalClient,
+        data
+      };
       pendingSaveRef.current = pending;
-      localStorage.setItem("bilan_pending_save", JSON.stringify(pending));
+      localStorage.setItem(cacheKey("bilan_pending_save"), JSON.stringify(pending));
       requestCreditForPendingSave(pending);
     } catch (e) {
       setRemoteSaveStatus("idle");
@@ -2338,8 +2598,12 @@ function BilanClient() {
   const loadSession = (key) => {
     try {
       const data = JSON.parse(localStorage.getItem(key) || "{}");
-      authorizedAssessmentRef.current = data.assessmentId || null;
-      if (data.client)
+      authorizedAssessmentRef.current = data.remoteConfirmed === true && isUuid(data.assessmentId) ? data.assessmentId : null;
+      currentClientIdRef.current = isUuid(data.clientId) ? data.clientId : null;
+      currentClientNameRef.current = normalizeClientName(data.fullName || "");
+      if (data.clientForm)
+        setClient(data.clientForm);
+      else if (data.client)
         setClient(data.client);
       if (data.plis2)
         setPlis(data.plis2);
@@ -2368,22 +2632,40 @@ function BilanClient() {
     }
   };
   const deleteSession = (key) => {
-    localStorage.removeItem(key);
-    const index = JSON.parse(localStorage.getItem("bilan_index") || "[]");
-    localStorage.setItem("bilan_index", JSON.stringify(index.filter((i) => i.key !== key)));
-  };
-  const getSessions = () => {
+    if (!confirm("Archiver ce bilan ? Il disparaîtra de l’historique actif, sans remboursement de crédit."))
+      return;
     try {
-      return JSON.parse(localStorage.getItem("bilan_index") || "[]");
-    } catch {
-      return [];
+      const data = JSON.parse(localStorage.getItem(key) || "{}");
+      if (data.schemaVersion === 2 && data.remoteConfirmed === true && isUuid(data.assessmentId)) {
+        pendingDeletesRef.current.set(data.assessmentId, { assessmentId: data.assessmentId, localKey: key });
+        window.parent.postMessage({
+          source: "longevite-bilan",
+          type: "BILAN_ARCHIVE_REQUEST",
+          ownerId: cacheOwnerRef.current,
+          assessmentId: data.assessmentId,
+          localKey: key
+        }, window.location.origin);
+        return;
+      }
+      localStorage.removeItem(key);
+      writeCacheIndex(readCacheIndex().filter((entry) => entry.key !== key));
+      setSyncVersion((version) => version + 1);
+    } catch (error) {
+      alert("Suppression impossible : " + error);
     }
   };
+  const getSessions = () => cacheOwnerRef.current ? readCacheIndex() : [];
   const exportSessions = () => {
     const sessions = getSessions();
-    const allData = sessions.map((s) => {
-      const d = localStorage.getItem(s.key);
-      return d ? { key: s.key, ...JSON.parse(d) } : null;
+    const allData = sessions.map((session) => {
+      try {
+        const raw = localStorage.getItem(session.key);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return { key: `bilan_${parsed.assessmentId || "legacy"}`, ...parsed };
+      } catch (_error) {
+        return null;
+      }
     }).filter(Boolean);
     const json = JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), sessions: allData }, null, 2);
     const blob = new Blob([json], { type: "application/json" });
@@ -2402,16 +2684,23 @@ function BilanClient() {
         if (!data.sessions)
           throw new Error("Format invalide");
         let count = 0;
-        data.sessions.forEach((s) => {
-          if (!s.key)
+        if (!cacheOwnerRef.current)
+          throw new Error("Session coach indisponible");
+        if (!Array.isArray(data.sessions))
+          throw new Error("Format invalide");
+        data.sessions.slice(0, 500).forEach((session) => {
+          if (!session || typeof session !== "object")
             return;
-          if (!localStorage.getItem(s.key)) {
-            const { key, ...rest } = s;
-            localStorage.setItem(key, JSON.stringify(rest));
-            const index = JSON.parse(localStorage.getItem("bilan_index") || "[]");
-            if (!index.find((i) => i.key === key)) {
+          const { key: _legacyKey, ...rest } = session;
+          const assessmentId = isUuid(rest.assessmentId) ? rest.assessmentId : randomUuid();
+          const clientId = isUuid(rest.clientId) ? rest.clientId : null;
+          const key = cacheKey(`bilan_${assessmentId}`);
+          if (!localStorage.getItem(key)) {
+            localStorage.setItem(key, JSON.stringify({ ...rest, assessmentId, clientId, remoteConfirmed: false, serverRevision: null }));
+            const index = readCacheIndex();
+            if (!index.find((entry) => entry.key === key)) {
               index.push({ key, label: rest.label, savedAt: rest.savedAt, period: rest.period, fullName: rest.fullName, globalScore: rest.globalScore });
-              localStorage.setItem("bilan_index", JSON.stringify(index));
+              writeCacheIndex(index);
             }
             count++;
           }
@@ -5845,8 +6134,9 @@ function BilanClient() {
     const firstPeriod = periodsComputed[0];
     const latestPeriod = periodsComputed[periodsComputed.length - 1];
     const refData = firstPeriod?.rawData;
-    const age2 = refData?.client ? parseInt(refData.client.age) || 30 : 30;
-    const genre2 = refData?.client?.genre || "homme";
+    const refClient = refData?.clientForm || refData?.client;
+    const age2 = refClient ? parseInt(refClient.age) || 30 : 30;
+    const genre2 = refClient?.genre || "homme";
     const NormBarDual = ({ val1, val2, period1, period2, zones }) => {
       if (!zones || zones.length === 0)
         return null;

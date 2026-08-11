@@ -1208,10 +1208,11 @@ function Field({ label, value, onChange, placeholder, type = "number", unit = ""
     style: { position: "absolute", right: 12, top: "50%", transform: "translateY(-50%)", fontSize: 10, color: C.gris, pointerEvents: "none" }
   }, unit)));
 }
+let BILAN_LOCKED = true;
 function LevelBadge({ result, label = "Résultat" }) {
   return /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:555:6",
-    style: { background: `linear-gradient(135deg, ${result.color}14, ${result.color}06)`, border: `1px solid ${result.color}38`, borderRadius: 14, padding: "18px 20px", marginTop: 16, display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative", overflow: "hidden" }
+    style: { background: `linear-gradient(135deg, ${result.color}14, ${result.color}06)`, border: `1px solid ${result.color}38`, borderRadius: 14, padding: "18px 20px", marginTop: 16, display: "flex", justifyContent: "space-between", alignItems: "center", position: "relative", overflow: "hidden", ...(BILAN_LOCKED ? { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" } : {}) }
   }, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:556:8",
     style: { position: "absolute", top: -20, right: -20, width: 80, height: 80, borderRadius: "50%", background: result.color + "0A", pointerEvents: "none" }
@@ -2043,6 +2044,7 @@ function BilanClient() {
   const [showHistory, setShowHistory] = useState(false);
     const [historySearch, setHistorySearch] = useState("");
     const [reportUnlocked, setReportUnlocked] = useState(false);
+    BILAN_LOCKED = !reportUnlocked;
   const [showSavePeriodModal, setShowSavePeriodModal] = useState(false);
   const [guideOpenId, setGuideOpenId] = useState(null);
   const [guideSection, setGuideSection] = useState("protocol");
@@ -3024,7 +3026,7 @@ function BilanClient() {
     const r4 = calcPlis4(plis2, parseInt(client.age || "0"), client.genre, plis2.morphotype);
     if (!r4)
       return null;
-    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(LevelBadge, {
+    return /* @__PURE__ */ React.createElement("div", { style: reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" } }, /* @__PURE__ */ React.createElement(LevelBadge, {
       "data-source": "BilanClient_Outil_v2.tsx:1207:26",
       result: r4,
       label: "Composition corporelle"
@@ -3064,7 +3066,7 @@ function BilanClient() {
           ["Excès", "≥ 31", "≥ 32", "≥ 33", "≥ 35", "≥ 36"]
         ]
       };
-      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(ScaleBar, {
+      return /* @__PURE__ */ React.createElement("div", { style: reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" } }, /* @__PURE__ */ React.createElement(ScaleBar, {
         "data-source": "BilanClient_Outil_v2.tsx:1247:32",
         value: pct,
         min: 0,
@@ -3104,7 +3106,7 @@ function BilanClient() {
         { label: "Obésité I", from: 30, to: 35, color: "#f97316" },
         { label: "Obésité II+", from: 35, to: 45, color: "#ef4444" }
       ];
-      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", {
+      return /* @__PURE__ */ React.createElement("div", { style: reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" } }, /* @__PURE__ */ React.createElement("div", {
         "data-source": "BilanClient_Outil_v2.tsx:1276:32",
         style: { marginTop: 12, background: imcLevel.c + "12", border: `1px solid ${imcLevel.c}30`, borderRadius: 10, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }
       }, /* @__PURE__ */ React.createElement("div", {
@@ -3453,7 +3455,7 @@ function BilanClient() {
         ["Obésité", "≥ 34%", "≥ 35%", "≥ 36%", "≥ 37%", "≥ 38%"]
       ]
     };
-    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(LevelBadge, {
+    return /* @__PURE__ */ React.createElement("div", { style: reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" } }, /* @__PURE__ */ React.createElement(LevelBadge, {
       "data-source": "BilanClient_Outil_v2.tsx:1516:22",
       result: plisRes,
       label: "Composition corporelle · 7 sites"
@@ -3501,7 +3503,7 @@ function BilanClient() {
         { label: "Obésité I", from: 30, to: 35, color: "#f97316" },
         { label: "Obésité II+", from: 35, to: 45, color: "#ef4444" }
       ];
-      return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", {
+      return /* @__PURE__ */ React.createElement("div", { style: reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" } }, /* @__PURE__ */ React.createElement("div", {
         "data-source": "BilanClient_Outil_v2.tsx:1548:28",
         style: { marginTop: 12, background: imcLevel.c + "12", border: `1px solid ${imcLevel.c}30`, borderRadius: 10, padding: "12px 16px", display: "flex", justifyContent: "space-between", alignItems: "center" }
       }, /* @__PURE__ */ React.createElement("div", {
@@ -3947,7 +3949,7 @@ function BilanClient() {
         ["Faible", "< 28", "< 24", "< 21", "< 17", "< 14"]
       ]
     };
-    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(ScaleBar, {
+    return /* @__PURE__ */ React.createElement("div", { style: reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" } }, /* @__PURE__ */ React.createElement(ScaleBar, {
       "data-source": "BilanClient_Outil_v2.tsx:1894:26",
       value: vo2,
       min: 15,
@@ -4185,7 +4187,7 @@ function BilanClient() {
         ["Faible", "< 28", "< 24", "< 21", "< 17", "< 14"]
       ]
     };
-    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(ScaleBar, {
+    return /* @__PURE__ */ React.createElement("div", { style: reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" } }, /* @__PURE__ */ React.createElement(ScaleBar, {
       "data-source": "BilanClient_Outil_v2.tsx:2035:26",
       value: vo2,
       min: 15,
@@ -4627,7 +4629,7 @@ function BilanClient() {
     unit: "cm"
   }), t2r && t2r.pdComp !== null && /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2211:22",
-    style: { background: "#8b5cf620", border: "1px solid #8b5cf650", borderRadius: 8, padding: "8px 12px", marginTop: 8, textAlign: "center" }
+    style: { background: "#8b5cf620", border: "1px solid #8b5cf650", borderRadius: 8, padding: "8px 12px", marginTop: 8, textAlign: "center", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2212:24",
     style: { fontSize: 9, color: "#a78bfa", letterSpacing: 2, textTransform: "uppercase" }
@@ -4662,7 +4664,7 @@ function BilanClient() {
     unit: "cm"
   }), t2r && t2r.pgComp !== null && /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2224:22",
-    style: { background: "#8b5cf620", border: "1px solid #8b5cf650", borderRadius: 8, padding: "8px 12px", marginTop: 8, textAlign: "center" }
+    style: { background: "#8b5cf620", border: "1px solid #8b5cf650", borderRadius: 8, padding: "8px 12px", marginTop: 8, textAlign: "center", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2225:24",
     style: { fontSize: 9, color: "#a78bfa", letterSpacing: 2, textTransform: "uppercase" }
@@ -4674,7 +4676,7 @@ function BilanClient() {
     result: t2r
   }), t2r && t2r.asymAnt !== null && t2r.asymAnt > 4 && /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2235:18",
-    style: { background: "#2d1000", border: "1px solid #f9731640", borderRadius: 8, padding: "10px 14px", marginTop: 10, fontSize: 12, color: "#f97316" }
+    style: { background: "#2d1000", border: "1px solid #f9731640", borderRadius: 8, padding: "10px 14px", marginTop: 10, fontSize: 12, color: "#f97316", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, "⚠ Asymétrie antérieure ", t2r.asymAnt.toFixed(1), " cm — risque de blessure × 2,5 · Travail proprioceptif unilatéral prioritaire"), /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2240:16",
     style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px" }
@@ -5160,7 +5162,7 @@ function BilanClient() {
         ["Très faible", "< 10", "< 8", "< 5", "< 2", "< 1"]
       ]
     };
-    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(ScaleBar, {
+    return /* @__PURE__ */ React.createElement("div", { style: reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" } }, /* @__PURE__ */ React.createElement(ScaleBar, {
       "data-source": "BilanClient_Outil_v2.tsx:2584:26",
       value: reps,
       min: 0,
@@ -5325,7 +5327,7 @@ function BilanClient() {
         ["Non acquis", "< 10", "< 8", "< 5", "< 2", "< 1"]
       ]
     };
-    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(ScaleBar, {
+    return /* @__PURE__ */ React.createElement("div", { style: reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" } }, /* @__PURE__ */ React.createElement(ScaleBar, {
       "data-source": "BilanClient_Outil_v2.tsx:2699:26",
       value: reps,
       min: 0,
@@ -5489,7 +5491,7 @@ function BilanClient() {
         ["Non acquis", "0", "0", "0", "0", "0"]
       ]
     };
-    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(ScaleBar, {
+    return /* @__PURE__ */ React.createElement("div", { style: reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" } }, /* @__PURE__ */ React.createElement(ScaleBar, {
       "data-source": "BilanClient_Outil_v2.tsx:2823:26",
       value: reps,
       min: 0,
@@ -5662,7 +5664,7 @@ function BilanClient() {
     result: t6r
   }), t6r && t6r.score <= 35 && /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2930:18",
-    style: { background: "#2d0a0a", border: "1px solid #ef444440", borderRadius: 8, padding: "10px 14px", marginTop: 10, fontSize: 12, color: "#ef4444" }
+    style: { background: "#2d0a0a", border: "1px solid #ef444440", borderRadius: 8, padding: "10px 14px", marginTop: 10, fontSize: 12, color: "#ef4444", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, "⚠ Ischios faibles — risque de claquage élevé · Priorité absolue dans le programme"), /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2934:16",
     style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px" }
@@ -6030,7 +6032,7 @@ function BilanClient() {
         ["Très faible", "< 12", "< 10", "< 8", "< 5", "< 3", "< 2"]
       ]
     };
-    return /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement(ScaleBar, {
+    return /* @__PURE__ */ React.createElement("div", { style: reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" } }, /* @__PURE__ */ React.createElement(ScaleBar, {
       "data-source": "BilanClient_Outil_v2.tsx:3183:22",
       value: Math.round(kg),
       min: 0,

@@ -87,6 +87,21 @@ function BilanWrapper() {
     )
   }, [])
 
+  const scheduleDelayedProfileRefresh = useCallback(() => {
+    // Le crédit est déjà décompté côté serveur au moment de la
+    // sauvegarde. On retarde volontairement le rafraîchissement local
+    // du profil, pour laisser le coach le temps de consulter et
+    // télécharger son rapport (PDF) avant que le solde affiché ne
+    // passe à 0 et que l'écran "Pack épuisé" ne reprenne l'écran.
+    const ownerAtScheduleTime = activeOwnerRef.current
+    window.setTimeout(() => {
+      if (ownerAtScheduleTime !== activeOwnerRef.current) return
+      void refreshProfile().catch(() => {
+        console.error('[bilan-profile] refresh_failed')
+      })
+    }, 180000)
+  }, [refreshProfile])
+
   const syncRemoteBilans = useCallback(async () => {
     const syncSequence = ++syncSequenceRef.current
     const ownerId = activeOwnerRef.current
@@ -210,18 +225,7 @@ function BilanWrapper() {
 
       if (message.type === 'BILAN_OUTPUT_DONE') {
         if (message.ownerId !== activeOwnerRef.current) return
-        // Le crédit est déjà décompté côté serveur au moment de la
-        // sauvegarde. On retarde volontairement le rafraîchissement local
-        // du profil, pour laisser le coach le temps de consulter et
-        // télécharger son rapport (PDF) avant que le solde affiché ne
-        // passe à 0 et que l'écran "Pack épuisé" ne reprenne l'écran.
-        const ownerAtScheduleTime = activeOwnerRef.current
-        window.setTimeout(() => {
-          if (ownerAtScheduleTime !== activeOwnerRef.current) return
-          void refreshProfile().catch(() => {
-            console.error('[bilan-profile] refresh_failed')
-          })
-        }, 180000)
+        scheduleDelayedProfileRefresh()
         return
       }
 
@@ -389,9 +393,13 @@ function BilanWrapper() {
         })
 
         if (result.ok) {
-          void refreshProfile().catch(() => {
-            console.error('[bilan-profile] refresh_failed')
-          })
+          // Ne pas rafraîchir le profil immédiatement : le coach doit
+          // pouvoir consulter/télécharger son rapport avant que l'écran
+          // "Pack épuisé" ne reprenne l'écran si son solde vient de
+          // passer à 0. Le rafraîchissement est retardé (voir
+          // scheduleDelayedProfileRefresh) et sera aussi déclenché par
+          // BILAN_OUTPUT_DONE le cas échéant.
+          scheduleDelayedProfileRefresh()
           void syncRemoteBilans()
         }
       } catch {
@@ -409,7 +417,7 @@ function BilanWrapper() {
 
     window.addEventListener('message', handleMessage)
     return () => window.removeEventListener('message', handleMessage)
-  }, [postToBilan, refreshProfile, syncRemoteBilans])
+  }, [postToBilan, refreshProfile, scheduleDelayedProfileRefresh, syncRemoteBilans])
 
   return (
     <div

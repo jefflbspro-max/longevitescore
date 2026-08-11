@@ -210,9 +210,18 @@ function BilanWrapper() {
 
       if (message.type === 'BILAN_OUTPUT_DONE') {
         if (message.ownerId !== activeOwnerRef.current) return
-        void refreshProfile().catch(() => {
-          console.error('[bilan-profile] refresh_failed')
-        })
+        // Le crédit est déjà décompté côté serveur au moment de la
+        // sauvegarde. On retarde volontairement le rafraîchissement local
+        // du profil, pour laisser le coach le temps de consulter et
+        // télécharger son rapport (PDF) avant que le solde affiché ne
+        // passe à 0 et que l'écran "Pack épuisé" ne reprenne l'écran.
+        const ownerAtScheduleTime = activeOwnerRef.current
+        window.setTimeout(() => {
+          if (ownerAtScheduleTime !== activeOwnerRef.current) return
+          void refreshProfile().catch(() => {
+            console.error('[bilan-profile] refresh_failed')
+          })
+        }, 180000)
         return
       }
 

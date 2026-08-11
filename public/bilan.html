@@ -2598,7 +2598,7 @@ function BilanClient() {
   const loadSession = (key) => {
     try {
       const data = JSON.parse(localStorage.getItem(key) || "{}");
-      authorizedAssessmentRef.current = data.remoteConfirmed === true && isUuid(data.assessmentId) ? data.assessmentId : null;
+      authorizedAssessmentRef.current = null;
       currentClientIdRef.current = isUuid(data.clientId) ? data.clientId : null;
       currentClientNameRef.current = normalizeClientName(data.fullName || "");
       if (data.clientForm)

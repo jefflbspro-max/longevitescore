@@ -2041,6 +2041,7 @@ function generateEvolutionReport(clientName, sessions, allSessionData) {
 function BilanClient() {
   const [tab, setTab] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
+    const [historySearch, setHistorySearch] = useState("");
   const [showSavePeriodModal, setShowSavePeriodModal] = useState(false);
   const [guideOpenId, setGuideOpenId] = useState(null);
   const [guideSection, setGuideSection] = useState("protocol");
@@ -2753,12 +2754,19 @@ function BilanClient() {
     title: "Historique des bilans",
     style: { background: showHistory ? "rgba(196,168,130,0.18)" : "rgba(196,168,130,0.08)", border: "1px solid rgba(196,168,130,0.25)", borderRadius: 8, padding: "6px 10px", color: C.or, cursor: "pointer", fontSize: 14 }
   }, "\uD83D\uDCC2"))), showHistory && (() => {
-    const sessions = getSessions();
+    const rawSessions = getSessions();
+    const sessions = historySearch.trim() ? rawSessions.filter((s) => (s.fullName || s.label || "").toLowerCase().includes(historySearch.trim().toLowerCase())) : rawSessions;
     return /* @__PURE__ */ React.createElement("div", {
       style: { position: "fixed", top: 64, right: 0, width: 320, maxHeight: "80vh", background: C.grisFonce, borderLeft: `1px solid rgba(196,168,130,0.2)`, borderBottom: `1px solid rgba(196,168,130,0.2)`, zIndex: 100, overflowY: "auto", padding: 16, boxShadow: "-8px 0 32px rgba(0,0,0,0.5)" }
     }, /* @__PURE__ */ React.createElement("div", {
       style: { fontSize: 9, color: C.or, letterSpacing: 2.5, textTransform: "uppercase", marginBottom: 12, fontWeight: 700 }
-    }, "Bilans sauvegardés"), sessions.length === 0 && /* @__PURE__ */ React.createElement("div", {
+    }, "Bilans sauvegardés"), /* @__PURE__ */ React.createElement("input", {
+    type: "text",
+    value: historySearch,
+    onChange: (e) => setHistorySearch(e.target.value),
+    placeholder: "Rechercher un client...",
+    style: { width: "100%", boxSizing: "border-box", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(196,168,130,0.2)", borderRadius: 8, padding: "8px 10px", fontSize: 12, color: C.ivoire, marginBottom: 12, outline: "none" }
+  }), sessions.length === 0 && /* @__PURE__ */ React.createElement("div", {
       style: { fontSize: 12, color: C.gris, textAlign: "center", padding: "20px 0" }
     }, "Aucun bilan sauvegardé.", /* @__PURE__ */ React.createElement("br", null), "Cliquez sur \uD83D\uDCBE pour sauvegarder."), sessions.map((s, i) => /* @__PURE__ */ React.createElement("div", {
       key: s.key,

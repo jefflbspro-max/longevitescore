@@ -2116,14 +2116,14 @@ function BilanClient() {
     }
     return true;
   };
+  const [evoClient, setEvoClient] = useState("");
+  const [client, setClient] = useState({ prenom: "", nom: "", age: "", taille: "", genre: "homme", profession: "", date: (/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR"), objectif: "" });
   React.useEffect(() => {
     if (!String(client.prenom || "").trim() && !String(client.nom || "").trim()) {
       currentClientIdRef.current = null;
       currentClientNameRef.current = "";
     }
   }, [client.prenom, client.nom]);
-  const [evoClient, setEvoClient] = useState("");
-  const [client, setClient] = useState({ prenom: "", nom: "", age: "", taille: "", genre: "homme", profession: "", date: (/* @__PURE__ */ new Date()).toLocaleDateString("fr-FR"), objectif: "" });
   const [plis2, setPlis] = useState({ pec: "", ax: "", tri: "", sub: "", abd: "", sup: "", cui: "", poids: "", bic: "", mode4: false, tailleTour: "", hanches: "", morphotype: "moyen" });
   const [t1, setT1] = useState({ mode: "ruffier", poids: "", temps: "", fc: "", P0: "", P1: "", P2: "", distance: "" });
   const [t1b, setT1b] = useState({ mode: "demi_cooper", enabled: false, poids: "", temps: "", fc: "", P0: "", P1: "", P2: "", distance: "" });

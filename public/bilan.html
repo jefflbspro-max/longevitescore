@@ -2042,6 +2042,7 @@ function BilanClient() {
   const [tab, setTab] = useState(0);
   const [showHistory, setShowHistory] = useState(false);
     const [historySearch, setHistorySearch] = useState("");
+    const [reportUnlocked, setReportUnlocked] = useState(false);
   const [showSavePeriodModal, setShowSavePeriodModal] = useState(false);
   const [guideOpenId, setGuideOpenId] = useState(null);
   const [guideSection, setGuideSection] = useState("protocol");
@@ -2275,6 +2276,7 @@ function BilanClient() {
       return;
     }
     doDownload(`Bilan_${client.prenom || "client"}_${client.nom || ""}.html`);
+    setReportUnlocked(true);
     setTimeout(notifyOutputDone, 500);
   };
   const exportPDF = () => {
@@ -2283,6 +2285,7 @@ function BilanClient() {
       return;
     }
     doDownload(`Bilan_${client.prenom || "client"}_${client.nom || ""}.html`);
+    setReportUnlocked(true);
     setTimeout(notifyOutputDone, 500);
   };
   const commitPendingSave = (pending, result = {}) => {
@@ -2600,6 +2603,7 @@ function BilanClient() {
     try {
       const data = JSON.parse(localStorage.getItem(key) || "{}");
       authorizedAssessmentRef.current = null;
+      setReportUnlocked(false);
       currentClientIdRef.current = isUuid(data.clientId) ? data.clientId : null;
       currentClientNameRef.current = normalizeClientName(data.fullName || "");
       if (data.clientForm)
@@ -6832,6 +6836,16 @@ function BilanClient() {
     }, client.nom)), /* @__PURE__ */ React.createElement("div", {
       style: { fontSize: 12, color: "#8A847C" }
     }, [client.profession, client.taille ? `${client.taille} cm` : "", client.age ? `${client.age} ans` : "", client.date].filter(Boolean).join(" · "))), avgScore2 > 0 && /* @__PURE__ */ React.createElement("div", {
+    style: { textAlign: "center", marginBottom: 20 }
+  }, /* @__PURE__ */ React.createElement("div", {
+    style: { fontSize: 9, color: C.or, letterSpacing: 3, textTransform: "uppercase", marginBottom: 6, fontWeight: 700 }
+  }, "Score de longévité"), /* @__PURE__ */ React.createElement("div", {
+    style: { fontSize: 48, fontFamily: "serif", color: globalColor, fontWeight: 300 }
+  }, avgScore2, /* @__PURE__ */ React.createElement("span", {
+    style: { fontSize: 16, color: "#8A847C" }
+  }, "/100"))), /* @__PURE__ */ React.createElement("div", {
+    style: reportUnlocked ? { position: "relative" } : { position: "relative", filter: "blur(7px)", pointerEvents: "none", userSelect: "none", opacity: 0.85 }
+  }, avgScore2 > 0 && /* @__PURE__ */ React.createElement("div", {
       style: { border: `2px solid ${globalColor}30`, borderRadius: 14, padding: "20px", marginBottom: 14, background: `linear-gradient(135deg,${globalColor}08,transparent)` }
     }, /* @__PURE__ */ React.createElement("div", {
       style: { fontSize: 8, color: C.or, letterSpacing: 3, textTransform: "uppercase", fontWeight: 800, marginBottom: 16 }
@@ -7300,7 +7314,7 @@ function BilanClient() {
       style: { flex: 1, fontSize: 11, color: C.ivoire }
     }, r.name), /* @__PURE__ */ React.createElement("span", {
       style: { fontSize: 11, fontWeight: 700, color: r.color, background: r.color + "18", padding: "2px 8px", borderRadius: 12 }
-    }, r.score, "/100"))))), /* @__PURE__ */ React.createElement("button", {
+    }, r.score, "/100")))))), /* @__PURE__ */ React.createElement("button", {
       onClick: exportPDF,
       style: { width: "100%", background: C.or, color: C.noir, border: "none", borderRadius: 12, padding: "16px", fontSize: 14, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 10 }
     }, /* @__PURE__ */ React.createElement(Download, {

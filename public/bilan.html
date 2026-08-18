@@ -3022,7 +3022,7 @@ function BilanClient() {
     onChange: (v) => setPlis((p) => ({ ...p, sup: v })),
     unit: "mm",
     placeholder: "Flanc, crête iliaque"
-  })), (() => {
+  })), /* @__PURE__ */ React.createElement("div", { style: reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" } }, (() => {
     const r4 = calcPlis4(plis2, parseInt(client.age || "0"), client.genre, plis2.morphotype);
     if (!r4)
       return null;
@@ -3303,7 +3303,7 @@ function BilanClient() {
         style: { fontSize: 9, color: C.gris, marginTop: 10, fontStyle: "italic", lineHeight: 1.6 }
       }, "Estimation : Masse maigre × ", client.genre === "homme" ? "0,75" : "0,70", " · Valeur indicative — une bioimpédancemétrie donne une mesure directe."));
     })());
-  })()), !plis2.mode4 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", {
+  })())), !plis2.mode4 && /* @__PURE__ */ React.createElement(React.Fragment, null, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:1418:16",
     style: { background: "rgba(196,168,130,0.06)", border: "1px solid rgba(196,168,130,0.18)", borderRadius: 10, padding: "14px 16px", marginBottom: 20 }
   }, /* @__PURE__ */ React.createElement("div", {
@@ -3398,7 +3398,7 @@ function BilanClient() {
     onChange: (v) => setPlis({ ...plis2, cui: v }),
     placeholder: "Ex : 24",
     unit: "mm"
-  }), (() => {
+  }), /* @__PURE__ */ React.createElement("div", { style: reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" } }, (() => {
     const vals = [plis2.pec, plis2.ax, plis2.tri, plis2.sub, plis2.abd, plis2.sup, plis2.cui].map((v) => parseFloat(v)).filter((v) => !isNaN(v) && v > 0);
     if (!vals.length)
       return null;
@@ -3697,7 +3697,7 @@ function BilanClient() {
       clientAge: age2,
       genre: client.genre
     }));
-  })()), (plis2.tailleTour || plis2.hanches || plis2.pec) && (() => {
+  })())), (plis2.tailleTour || plis2.hanches || plis2.pec) && /* @__PURE__ */ React.createElement("div", { style: reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" } }, (() => {
     const wc = parseFloat(plis2.tailleTour);
     const hc = parseFloat(plis2.hanches);
     const hauteur = parseFloat(client.taille);
@@ -3838,7 +3838,7 @@ function BilanClient() {
       "data-source": "BilanClient_Outil_v2.tsx:1811:26",
       style: { fontSize: 9, color: C.gris, marginBottom: 4, textAlign: "center", fontStyle: "italic" }
     }, "WHtR — Rapport Taille/Hauteur · Indicateur adiposité abdominale")));
-  })()), tab === 2 && /* @__PURE__ */ React.createElement("div", {
+  })())), tab === 2 && /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:1822:14"
   }, /* @__PURE__ */ React.createElement(SectionHeader, {
     "data-source": "BilanClient_Outil_v2.tsx:1823:16",
@@ -3901,7 +3901,7 @@ function BilanClient() {
     unit: "bpm"
   }), t1r && t1r.mode === "rockport" && /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:1852:22",
-    style: { background: t1r.color + "15", border: `1px solid ${t1r.color}40`, borderRadius: 12, padding: 20, marginTop: 8 }
+    style: { background: t1r.color + "15", border: `1px solid ${t1r.color}40`, borderRadius: 12, padding: 20, marginTop: 8, ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:1853:24",
     style: { fontSize: 10, color: C.gris, letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }
@@ -3964,7 +3964,7 @@ function BilanClient() {
     }));
   })(), /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:1899:20",
-    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px" }
+    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:1900:22",
     style: { fontSize: 10, color: C.gris, letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }
@@ -4115,7 +4115,7 @@ function BilanClient() {
     placeholder: "ex: 1800"
   }), t1r && t1r.mode === "demi_cooper" && /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:1982:22",
-    style: { background: t1r.color + "15", border: `1px solid ${t1r.color}40`, borderRadius: 12, padding: "16px", marginTop: 12 }
+    style: { background: t1r.color + "15", border: `1px solid ${t1r.color}40`, borderRadius: 12, padding: "16px", marginTop: 12, ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:1983:24",
     style: { fontSize: 9, color: C.gris, letterSpacing: 2, textTransform: "uppercase", marginBottom: 10 }
@@ -4403,7 +4403,7 @@ function BilanClient() {
     unit: "bpm"
   }), t1r && t1r.mode === "ruffier" && /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2132:22",
-    style: { background: t1r.color + "15", border: `1px solid ${t1r.color}40`, borderRadius: 12, padding: 20, marginTop: 8 }
+    style: { background: t1r.color + "15", border: `1px solid ${t1r.color}40`, borderRadius: 12, padding: 20, marginTop: 8, ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2133:24",
     style: { fontSize: 10, color: C.gris, letterSpacing: 2, textTransform: "uppercase", marginBottom: 8 }
@@ -4418,7 +4418,7 @@ function BilanClient() {
     style: { fontSize: 14, fontWeight: 700, color: t1r.color }
   }, "→ ", t1r.level)), /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2139:20",
-    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px" }
+    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2140:22",
     style: { fontSize: 10, color: C.gris, letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }
@@ -4679,7 +4679,7 @@ function BilanClient() {
     style: { background: "#2d1000", border: "1px solid #f9731640", borderRadius: 8, padding: "10px 14px", marginTop: 10, fontSize: 12, color: "#f97316", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, "⚠ Asymétrie antérieure ", t2r.asymAnt.toFixed(1), " cm — risque de blessure × 2,5 · Travail proprioceptif unilatéral prioritaire"), /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2240:16",
-    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px" }
+    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2241:18",
     style: { fontSize: 10, color: C.gris, letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }
@@ -4902,7 +4902,7 @@ function BilanClient() {
     style: { fontSize: 18, fontFamily: serif, color: t3r.color }
   }, t3r.composite, "/100 → ", t3r.level))), /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2402:20",
-    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px" }
+    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2403:22",
     style: { fontSize: 10, color: C.gris, letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }
@@ -5019,7 +5019,7 @@ function BilanClient() {
     style: { fontSize: 14, fontWeight: 700, color: t3r.color, marginTop: 6 }
   }, "→ ", t3r.level)), /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2465:20",
-    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px" }
+    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2466:22",
     style: { fontSize: 10, color: C.gris, letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }
@@ -5123,7 +5123,7 @@ function BilanClient() {
     result: t4r
   }), /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2542:20",
-    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px" }
+    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, t4r && (() => {
     const reps = t4r.r;
     const age2 = parseInt(client.age || "0");
@@ -5253,7 +5253,7 @@ function BilanClient() {
     });
   })(), /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2638:20",
-    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px" }
+    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2639:22",
     style: { fontSize: 10, color: C.gris, letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }
@@ -5342,7 +5342,7 @@ function BilanClient() {
     }));
   })(), /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2704:20",
-    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px" }
+    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2705:22",
     style: { fontSize: 10, color: C.gris, letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }
@@ -5506,7 +5506,7 @@ function BilanClient() {
     }));
   })(), /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2828:20",
-    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px" }
+    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2829:22",
     style: { fontSize: 10, color: C.gris, letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }
@@ -5562,7 +5562,7 @@ function BilanClient() {
     result: t5r
   }), /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2860:20",
-    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px" }
+    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2861:22",
     style: { fontSize: 10, color: C.gris, letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }
@@ -5667,7 +5667,7 @@ function BilanClient() {
     style: { background: "#2d0a0a", border: "1px solid #ef444440", borderRadius: 8, padding: "10px 14px", marginTop: 10, fontSize: 12, color: "#ef4444", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, "⚠ Ischios faibles — risque de claquage élevé · Priorité absolue dans le programme"), /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2934:16",
-    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px" }
+    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:2935:18",
     style: { fontSize: 10, color: C.gris, letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }
@@ -5785,7 +5785,7 @@ function BilanClient() {
     result: t7r
   }), /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:3010:20",
-    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px" }
+    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:3011:22",
     style: { fontSize: 10, color: C.gris, letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }
@@ -5839,7 +5839,7 @@ function BilanClient() {
     result: t7r
   }), /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:3036:20",
-    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px" }
+    style: { marginTop: 14, background: C.grisFonce, border: `1px solid ${C.grisMoyen}`, borderRadius: 10, padding: "12px 16px", ...(reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" }) }
   }, /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:3037:22",
     style: { fontSize: 10, color: C.gris, letterSpacing: 2, marginBottom: 10, textTransform: "uppercase" }
@@ -5933,7 +5933,7 @@ function BilanClient() {
   }), /* @__PURE__ */ React.createElement("span", {
     "data-source": "BilanClient_Outil_v2.tsx:3091:28",
     style: { paddingRight: 10, color: C.gris, fontSize: 11 }
-  }, "kg"))))), t8r && ((key) => {
+  }, "kg"))))), /* @__PURE__ */ React.createElement("div", { style: reportUnlocked ? {} : { filter: "blur(6px)", pointerEvents: "none", userSelect: "none" } }, t8r && ((key) => {
     const v = t8r[key === "Main droite" ? "bestR" : "bestL"];
     return v !== null ? /* @__PURE__ */ React.createElement("div", {
       "data-source": "BilanClient_Outil_v2.tsx:3099:42",
@@ -6119,7 +6119,7 @@ function BilanClient() {
   }, title), /* @__PURE__ */ React.createElement("div", {
     "data-source": "BilanClient_Outil_v2.tsx:3234:26",
     style: { fontSize: 11, color: C.gris, lineHeight: 1.6 }
-  }, text))))))), tab === 11 && (() => {
+  }, text)))))))), tab === 11 && (() => {
     const allSessions = getSessions();
     const clients = [...new Set(allSessions.map((s) => s.fullName || s.label.split(" · ")[0]).filter(Boolean))];
     const currentClient = evoClient || clients[0] || "";
